@@ -198,6 +198,17 @@ async function init() {
           'M: Change Light Shading: '+ shadings[tracerObj._currModel[0]]+"\n"+
           'N: Change Light Model: ' + models[tracerObj._currModel[1]]);
           break;
+      
+      //change the intensity of directional light
+      case "1":
+        directionalLight._intensity[0]= directionalLight._intensity[0]-0.1
+        directionalLight._intensity[1]=directionalLight._intensity[1]-0.1
+        directionalLight._intensity[2]=directionalLight._intensity[2]-0.1
+        
+        tracerObj.updateLight(lightModels[currModel]);
+        break;
+
+
       }
   });
   
