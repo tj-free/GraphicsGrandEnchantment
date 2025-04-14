@@ -595,6 +595,7 @@ fn getLightInfo(lightPos: vec3f, lightDir: vec3f, hitPoint: vec3f, objectNormal:
     out.dist= dot(hitPoint - lightPos,hitPoint - lightPos); 
     return out;
   }
+  //directional light
   else if (light.model[1]==1){
     // first, get the source intensity
     var intensity = light.intensity; 
@@ -610,6 +611,7 @@ fn getLightInfo(lightPos: vec3f, lightDir: vec3f, hitPoint: vec3f, objectNormal:
 
     return out;
   }
+  //Spot light
   else{
     // first, get the source intensity
     var intensity = light.intensity; 
