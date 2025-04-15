@@ -268,6 +268,8 @@ struct VolInfo {
 // binding the output texture to store the ray tracing results
 @group(0) @binding(3) var outTexture: texture_storage_2d<rgba8unorm, write>;
 
+// @group(0) @binding(4) var<uniform> toggleModel: f32;
+
 // a function to transform the direction to the model coordiantes
 fn transformDir(d: vec3f) -> vec3f {
   // transform the direction using the camera pose
@@ -378,6 +380,58 @@ fn traceScene(uv: vec2i, p: vec3f, d: vec3f) {
   textureStore(outTexture, uv, color);  
 }
 
+fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f) {
+  // find the start and end point
+  var hits = rayVolumeIntersection(p, d);
+
+
+  var curHit = hits.x + 0.02;
+
+
+  let halfSize: vec3f = volInfo.dims.xyz * volInfo.sizes.xyz * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z);
+  let voxelSize: vec3f = vec3f(1,1,1) * volInfo.sizes.xyz / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z); // normalized voxel size
+
+
+  var color = vec4f(0.f/255, 56.f/255, 101.f/255, 1.); // Bucknell Blue
+  while (curHit < hits.y) {
+    let curPt: vec3f = p + d * curHit + halfSize;
+
+    let vPos = curPt / voxelSize;
+    var minCorner = floor(vPos);
+    var maxCorner = ceil(vPos);
+    curHit = getNextHitValue(hits.x, curHit, minCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy); // xy
+    curHit = getNextHitValue(hits.x, curHit, maxCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy);
+    curHit = getNextHitValue(hits.x, curHit, minCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz); // yz
+    curHit = getNextHitValue(hits.x, curHit, maxCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz);
+    curHit = getNextHitValue(hits.x, curHit, minCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz); // xz
+    curHit = getNextHitValue(hits.x, curHit, maxCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz);
+   
+    if (all(vPos >= vec3f(0)) && all(vPos < volInfo.dims.xyz)) {
+      let vIdx: i32 = i32(vPos.z) * i32(volInfo.dims.x * volInfo.dims.y)
+                      + i32(vPos.y) * i32(volInfo.dims.x)
+                      + i32(vPos.x);
+      if (i32(volData[vIdx]) != 0) {
+        if (volData[vIdx] < volInfo.dims.y * 0.1) {
+          color = vec4f(255.f/255, 250.f/255, 250.f/255, 1.); // Snow
+        }
+        else if (volData[vIdx] < volInfo.dims.y * 0.35) {
+          color = vec4f(129.f/255, 139.f/255, 153.f/255, 1.); // Mountain
+        }
+        else if (volData[vIdx] < volInfo.dims.y * 0.6) {
+          color = vec4f(0.f/255, 170.f/255, 0.f/255, 1.); // Grass
+        }
+        else {
+          color = vec4f(96.f/255, 177.f/255, 199.f/255, 1.); // Water
+        }
+        break;
+      }
+    }
+    curHit += 0.002;
+  }
+  textureStore(outTexture, uv, color);
+}
+
+
 @compute
 @workgroup_size(16, 16)
 fn computeOrthogonalMain(@builtin(global_invocation_id) global_id: vec3u) {
@@ -394,7 +448,8 @@ fn computeOrthogonalMain(@builtin(global_invocation_id) global_id: vec3u) {
     spt = transformPt(spt);
     rdir = transformDir(rdir);
     // trace scene
-    traceScene(uv, spt, rdir);
+    // traceScene(uv, spt, rdir);
+    traceTerrain(uv, spt, rdir);
   }
 }
 
@@ -414,6 +469,7 @@ fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u) {
     spt = transformPt(spt);
     rdir = transformDir(rdir);
     // trace scene
-    traceScene(uv, spt, rdir);
+    // traceScene(uv, spt, rdir);
+    traceTerrain(uv, spt, rdir);
   }
 }
