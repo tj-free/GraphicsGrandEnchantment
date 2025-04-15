@@ -32,7 +32,6 @@ import RayTracer from './lib/Viz/RayTracer.js'
 import StandardTextObject from './lib/DSViz/StandardTextObject.js'
 import VolumeRenderingSimpleObject from './lib/DSViz/VolumeRenderingSimpleObject.js'
 import Camera from './lib/Viz/3DCamera.js'
-import RayTracingObject from './lib/DSViz/RayTracingObject.js'
 
 async function init() {
   // Create a canvas tag
@@ -46,7 +45,11 @@ async function init() {
   var camera = new Camera();
   camera.moveZ(-1);
   // Create an object to trace
-  var tracerObj= new VolumeRenderingSimpleObject(tracer._device, tracer._canvasFormat, camera, 2);
+  var blockTextures= ["./assets/textures/blocks/azalea_leaves.png", "./assets/textures/blocks/dirt.png","./assets/textures/blocks/grass_carried.png", "./assets/textures/blocks/grass_side_carried.png", "./assets/textures/blocks/grass_side_snowed.png", "./assets/textures/blocks/log_oak_top.png","./assets/textures/blocks/log_oak.png","./assets/textures/blocks/snow.png","./assets/textures/blocks/stone.png"]
+  var particleTextures=["./assets/textures/particles/pale_oak_leaves_atlas.png","./assets/textures/particles/particles.png"]
+
+  var tracerObj= new VolumeRenderingSimpleObject(tracer._device, tracer._canvasFormat,
+  camera, true, blockTextures.concat(particleTextures));
   
   await tracer.setTracerObject(tracerObj);
  
