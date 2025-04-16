@@ -28,7 +28,7 @@
 // Firefox Nightly: sudo snap install firefox --channel=latext/edge or download from https://www.mozilla.org/en-US/firefox/channel/desktop/
 
 
-import RayTracer from './lib/Viz/RayTracer.js'
+import VRRayTracer from './lib/Viz/VRRayTracer.js'
 import StandardTextObject from './lib/DSViz/StandardTextObject.js'
 import VolumeRenderingSimpleObject from './lib/DSViz/VolumeRenderingSimpleObject.js'
 import Camera from './lib/Viz/3DCamera.js'
@@ -38,12 +38,17 @@ async function init() {
   const canvasTag = document.createElement('canvas');
   canvasTag.id = "renderCanvas";
   document.body.appendChild(canvasTag);
+
+  const xrButton = document.createElement('button');
+  xrButton.id = "xr-button";
+  document.body.appendChild(xrButton);
+
   // Create a ray tracer
-  const tracer = new RayTracer(canvasTag);
-  await tracer.init();
-  // Create a 3D Camera
   var camera = new Camera();
   camera.moveZ(-1);
+  const tracer = new VRRayTracer(canvasTag, camera);
+  await tracer.init();
+  // Create a 3D Camera
   // Create an object to trace
   var blockTextures= ["./assets/textures/blocks/azalea_leaves.png", "./assets/textures/blocks/dirt.png","./assets/textures/blocks/grass_carried.png", "./assets/textures/blocks/grass_side_carried.png", "./assets/textures/blocks/grass_side_snowed.png", "./assets/textures/blocks/log_oak_top.png","./assets/textures/blocks/log_oak.png","./assets/textures/blocks/snow.png","./assets/textures/blocks/stone.png"]
   var particleTextures=["./assets/textures/particles/pale_oak_leaves_atlas.png","./assets/textures/particles/particles.png"]
@@ -56,7 +61,7 @@ async function init() {
   let toggleMovement=true;
   
   let fps = '??';
-  var fpsText = new StandardTextObject('fps: ' + fps);
+  var fpsText = new StandardTextObject('VR FPS: ' + 100 + '\n' + 'FPS: ' + 100);
   fpsText._textCanvas.style.left="1460px";
   const infoText = new StandardTextObject('WS: Move in Z\n' +
                                           'AD: Move in X\n' +
@@ -147,26 +152,10 @@ async function init() {
        toggleMovement= !toggleMovement;
   }
   });
-  // run animation at 60 fps
-  var frameCnt = 0;
-  var tgtFPS = 60;
-  var secPerFrame = 1. / tgtFPS;
-  var frameInterval = secPerFrame * 1000;
-  var lastCalled;
-  let renderFrame = () => {
-    let elapsed = Date.now() - lastCalled;
-    if (elapsed > frameInterval) {
-      ++frameCnt;
-      lastCalled = Date.now() - (elapsed % frameInterval);
-      tracer.render();
-    }
-    requestAnimationFrame(renderFrame);
-  };
-  lastCalled = Date.now();
-  renderFrame();
+  
+  // Update FPS text
   setInterval(() => {
-    fpsText.updateText('fps: ' + frameCnt);
-    frameCnt = 0;
+    fpsText.updateText('VR FPS: ' + tracer._VRFps + '\n' + 'FPS: ' + tracer._fps);
   }, 1000); // call every 1000 ms
   return tracer;
 }

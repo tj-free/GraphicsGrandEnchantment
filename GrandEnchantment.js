@@ -27,6 +27,7 @@
 // Firefox Nightly: sudo snap install firefox --channel=latext/edge or download from https://www.mozilla.org/en-US/firefox/channel/desktop/
 
 import RayTracer from './lib/Viz/RayTracer.js'
+import VRRayTracer from './lib/Viz/VRRayTracer.js'
 import StandardTextObject from './lib/DSViz/StandardTextObject.js'
 import RayTracingBoxLightObject from './lib/DSViz/RayTracingBoxLightObject.js'
 import Camera from './lib/Viz/3DCamera.js'
@@ -39,8 +40,13 @@ async function init() {
   const canvasTag = document.createElement('canvas');
   canvasTag.id = "renderCanvas";
   document.body.appendChild(canvasTag);
+
+  const xrButton = document.createElement('button');
+  xrButton.id = "xr-button";
+  document.body.appendChild(xrButton);
+
   // Create a ray tracer
-  const tracer = new RayTracer(canvasTag);
+  const tracer = new VRRayTracer(canvasTag);
   await tracer.init();
   // Create a 3D Camera
   var camera = new Camera();
@@ -197,21 +203,7 @@ async function init() {
   
   // run animation at 60 fps
   var frameCnt = 0;
-  var tgtFPS = 60;
-  var secPerFrame = 1. / tgtFPS;
-  var frameInterval = secPerFrame * 1000;
-  var lastCalled;
-  let renderFrame = () => {
-    let elapsed = Date.now() - lastCalled;
-    if (elapsed > frameInterval) {
-      ++frameCnt;
-      lastCalled = Date.now() - (elapsed % frameInterval);
-      tracer.render();
-    }
-    requestAnimationFrame(renderFrame);
-  };
-  lastCalled = Date.now();
-  renderFrame();
+
   setInterval(() => { 
     fpsText.updateText('fps: ' + frameCnt);
     frameCnt = 0;
