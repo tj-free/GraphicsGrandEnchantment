@@ -32,7 +32,6 @@ import VRRayTracer from './lib/Viz/VRRayTracer.js'
 import StandardTextObject from './lib/DSViz/StandardTextObject.js'
 import VolumeRenderingSimpleObject from './lib/DSViz/VolumeRenderingSimpleObject.js'
 import Camera from './lib/Viz/3DCamera.js'
-import VRInput from './lib/Input/VRInput.js';
 
 async function init() {
   // Create a canvas tag
@@ -45,9 +44,9 @@ async function init() {
   document.body.appendChild(xrButton);
 
   // Create a ray tracer
-  var leftCamera = new Camera();
-  var rightCamera = new Camera();
-  const tracer = new VRRayTracer(canvasTag);
+  var camera = new Camera();
+  camera.moveZ(-1);
+  const tracer = new VRRayTracer(canvasTag, camera);
   await tracer.init();
   // Create a 3D Camera
   // Create an object to trace
@@ -55,25 +54,10 @@ async function init() {
   var particleTextures=["./assets/textures/particles/pale_oak_leaves_atlas.png","./assets/textures/particles/particles.png"]
 
   var tracerObj= new VolumeRenderingSimpleObject(tracer._device, tracer._canvasFormat,
-  [leftCamera, rightCamera], true, blockTextures.concat(particleTextures));
+  camera, true, blockTextures.concat(particleTextures));
   
-  var vrInput = new VRInput();
-
   await tracer.setTracerObject(tracerObj);
  
-  leftCamera.moveZ(-2);
-  leftCamera.moveY(0.5);
-  // NOTE: cameras need to be rotated?
-  // How do humans see
-  // leftCamera.moveX(0.0298200368);
-  leftCamera.moveX(-0.008);
-  leftCamera.rotateY(5);
-  rightCamera.moveZ(-2);
-  rightCamera.moveY(0.5);
-  // rightCamera.moveX(-0.0298200368);
-  rightCamera.moveX(0.008);
-  rightCamera.rotateY(-5);
-  
   let toggleMovement=true;
   
   let fps = '??';
@@ -96,92 +80,72 @@ async function init() {
   var focalYSpeed = 0.1;
   document.addEventListener('keydown', async (e) => {
     switch (e.key) {
-      case 'g':
-        tracer.switchCamera(0)
-        tracerObj.updateCameraPose();
-        break;
-      case 'h':
-        tracer.switchCamera(1)
-        tracerObj.updateCameraPose();
-        break;
       case 'w': case 'W':
-        leftCamera.moveZ(movespeed);
-        rightCamera.moveZ(movespeed);
+        camera.moveZ(movespeed);
         tracerObj.updateCameraPose();
         break;
       case 'a': case 'A':
-        leftCamera.moveX(-movespeed);
-        rightCamera.moveX(-movespeed);
+        camera.moveX(-movespeed);
         tracerObj.updateCameraPose();
         break;
       case 's': case 'S':
-        leftCamera.moveZ(-movespeed);
-        rightCamera.moveZ(-movespeed);
+        camera.moveZ(-movespeed);
         tracerObj.updateCameraPose();
         break;
       case 'd': case 'D':
-        leftCamera.moveX(movespeed);
-        rightCamera.moveX(movespeed);
+        camera.moveX(movespeed);
         tracerObj.updateCameraPose();
         break;
       case ' ':
-        leftCamera.moveY(-movespeed);
-        rightCamera.moveY(-movespeed);
+        camera.moveY(-movespeed);
         tracerObj.updateCameraPose();
         break;
       case 'Shift':
-        leftCamera.moveY(movespeed);
-        rightCamera.moveY(movespeed);
+        camera.moveY(movespeed);
         tracerObj.updateCameraPose();
         break;
       case 'q': case 'Q':
-        leftCamera.rotateZ(rotatespeed);
-        rightCamera.rotateZ(rotatespeed);
+        camera.rotateZ(rotatespeed);
         tracerObj.updateCameraPose();
         break;
       case 'e': case'E':
-        leftCamera.rotateZ(-rotatespeed);
-        rightCamera.rotateZ(-rotatespeed);
+        camera.rotateZ(-rotatespeed);
         tracerObj.updateCameraPose();
         break;
       case 'ArrowUp':
-        leftCamera.rotateX(-rotatespeed);
-        rightCamera.rotateX(-rotatespeed);
+        camera.rotateX(-rotatespeed);
         tracerObj.updateCameraPose();
         break;
       case 'ArrowLeft':
-        leftCamera.rotateY(rotatespeed);
-        rightCamera.rotateY(rotatespeed);
+        camera.rotateY(rotatespeed);
         tracerObj.updateCameraPose();
         break;
       case 'ArrowDown':
-        leftCamera.rotateX(rotatespeed);
-        rightCamera.rotateX(rotatespeed);
+        camera.rotateX(rotatespeed);
         tracerObj.updateCameraPose();
         break;
       case 'ArrowRight':
-        leftCamera.rotateY(-rotatespeed);
-        rightCamera.rotateY(-rotatespeed);
+        camera.rotateY(-rotatespeed);
         tracerObj.updateCameraPose();
         break;
+      case 't': case 'T':
+        // console.log("Button Press")
+        camera.toggleProjective();
+        break;
       case '-':
-        leftCamera.changeFocalX(focalXSpeed);
-        rightCamera.changeFocalX(focalXSpeed);
+        camera.changeFocalX(focalXSpeed);
         tracerObj.updateCameraFocal();
         break;
       case '=':
-        leftCamera.changeFocalX(-focalXSpeed);
-        rightCamera.changeFocalX(-focalXSpeed);
+        camera.changeFocalX(-focalXSpeed);
         tracerObj.updateCameraFocal();
         break;
       case '[':
-        leftCamera.changeFocalY(focalYSpeed);
-        rightCamera.changeFocalY(focalYSpeed);
+        camera.changeFocalY(focalYSpeed);
         tracerObj.updateCameraFocal();
         break;
       case ']':
-        leftCamera.changeFocalY(-focalYSpeed);
-        rightCamera.changeFocalY(-focalYSpeed);
+        camera.changeFocalY(-focalYSpeed);
         tracerObj.updateCameraFocal();
         break;
       case "u": case "U":
