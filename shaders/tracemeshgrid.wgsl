@@ -1,7 +1,7 @@
-/* 
+/*!
  * Copyright (c) 2025 SingChun LEE @ Bucknell University. CC BY-NC 4.0.
  * 
- * This code is provided mainly for educational purposes at Bucknell University.
+ * This code is provided mainly for educational and research purposes at Bucknell University.
  *
  * This code is licensed under the Creative Commons Attribution-NonCommerical 4.0
  * International License. To view a copy of the license, visit 
@@ -13,9 +13,9 @@
  *  - Adapt: remix, transform, and build upon the material.
  *
  * Under the following terms:
- *  - Attribution: You must give appropriate credit, provide a link to the license,
- *                 and indicate if changes where made.
- *  - NonCommerical: You may not use the material for commerical purposes.
+ *  - Attribution: You must give appropriate credit, provide a link to the license, 
+ *                 and indicate if changes were made.
+ *  - NonCommerical: You may not use the material for commercial purposes.
  *  - No additional restrictions: You may not apply legal terms or technological 
  *                                measures that legally restrict others from doing
  *                                anything the license permits.
@@ -246,82 +246,93 @@ fn applyMotorToDir(d: vec3f, m: MultiVector) -> vec3f {
   return extractPoint(new_d);
 }
 
+fn isInside(v0: vec3f, v1: vec3f, v2: vec3f, p: vec3f) -> vec4f {
+  let pga0 = createPoint(v0);
+  let pga1 = createPoint(v1);
+  let pga2 = createPoint(v2);
+  let pgap = createPoint(p);
+  let plane012 = createPlaneFromPoints(v0, v1, v2);
+  let planep12 = createPlaneFromPoints(p, v1, v2);
+  let plane0p2 = createPlaneFromPoints(v0, p, v2);
+  let plane01p = createPlaneFromPoints(v0, v1, p);
+  let area012 = plane012.ex * plane012.ex + plane012.ey * plane012.ey + plane012.ez * plane012.ez + plane012.eo * plane012.eo;
+  let areap12 = plane012.ex * planep12.ex + plane012.ey * planep12.ey + plane012.ez * planep12.ez + plane012.eo * planep12.eo;
+  let area0p2 = plane012.ex * plane0p2.ex + plane012.ey * plane0p2.ey + plane012.ez * plane0p2.ez + plane012.eo * plane0p2.eo;
+  let area01p = plane012.ex * plane01p.ex + plane012.ey * plane01p.ey + plane012.ez * plane01p.ez + plane012.eo * plane01p.eo;
+  
+  // compute barycentric coordinates
+  let lambda1 = areap12 / area012;
+  let lambda2 = area0p2 / area012;
+  let lambda3 = area01p / area012;
+  return vec4f(lambda1, lambda2, lambda3, f32(lambda1 >= 0 && lambda1 <= 1 && lambda2 >= 0 && lambda2 <= 1 && lambda3 >= 0 && lambda3 <= 1));
+}
+
+// a helper function to get the hit point of a ray to a triangle
+fn triangleRayHitCheck(s: vec3f, d: vec3f, v1: vec3f, v2: vec3f, v3: vec3f, ct: f32) -> vec4f {
+  // Step 1: Construct the ray as a line in PGA
+  let L = createLine(s, d);
+  // Step 2: Construct the plane in PGA
+  let P = createPlaneFromPoints(v1, v2, v3); // we only need three points to define a plane
+  // Step 3: Compute the intersection info
+  var hitInfo = linePlaneIntersection(L, P);
+  if (hitInfo.hit) {
+    // Step 4: Check if the hit point within the triangle
+    let triInfo = isInside(v1, v2, v3, hitInfo.p);
+    if (bool(triInfo.w)) {
+      var nt: f32 = -1.;
+      // pick one axis to compute the t value
+      if (d.x > EPSILON) {
+        nt = (hitInfo.p.x - s.x) / d.x;
+      }
+      else if (d.y > EPSILON) {
+        nt = (hitInfo.p.y - s.y) / d.y;
+      }
+      else {
+        nt = (hitInfo.p.z - s.z) / d.z;
+      }
+      // return the hit cases
+      if (nt < 0) {
+        return vec4f(ct, -1, -1., -1.); // Case 1: the ray has already passed the face, no hit
+      }
+      else if (ct < 0) {
+        return vec4f(nt, triInfo.xyz); // Case 2: the first hit is nt, and say it hits the new face
+      }
+      else {
+        if (nt < ct) {
+          return vec4f(nt, triInfo.xyz); // Case 3: the closer is nt, and say it hits the new face first
+        }
+        else {
+          return vec4f(ct, -1., -1., -1.); // Case 4: the closer is ct, and say it hits the old face first
+        }
+      }
+    }
+  }
+  return vec4f(ct, -1., -1., -1.); // Default Case: no hit
+}
+
 // struct to store 3D PGA pose
 struct Camera {
   motor: MultiVector,
   focal: vec2f,
   res: vec2f,
 }
-struct Quad {
-  ll: vec4f, // lower left
-  lr: vec4f, // lower right
-  ur: vec4f, // upper right
-  rl: vec4f, // upper left
-}
-struct Box {
-  motor: MultiVector,     // the model pose of the box
-  scale: vec4f,           // the scale of the box
-  faces: array<Quad, 6>,  // six faces: front, back, left, right, top, down
-}
-// struct to store the volume info
-struct VolInfo {
-  dims: vec4f, // volume dimension
-  sizes: vec4f, // voxel sizes
+
+// struct to store the grid
+struct Grid {
+  dims: vec4f,       // the dimension of the voxel grid
+  minPt: vec4f,      // the min corner or the voxel grid
+  delta: vec4f,      // the voxel delta size
+  cells: array<f32>  // an array of triangle indices - each cell has at most delta.w's triangles
 }
 
-struct CellInfo { // this is packed in 64
-  terrainType: f32, // the terrain type
-  particleIndices: array<f32, 63>, // the particles in this cell
-}
+@group(0) @binding(0) var<uniform> cameraPose: Camera;               // camera pose
+@group(0) @binding(1) var<storage> vertices: array<array<f32, 6>>;   // vertices
+@group(0) @binding(2) var<storage> triangles: array<u32>;            // triangles
+@group(0) @binding(3) var<storage> grid: Grid;                       // the voxel grid
+@group(0) @binding(4) var outTexture: texture_storage_2d<rgba8unorm, write>;
 
-// binding the camera pose
-@group(0) @binding(0) var<uniform> cameraPose: Camera ;
-// binding the volume info
-@group(0) @binding(1) var<uniform> volInfo: VolInfo;
-// binding the volume data
-@group(0) @binding(2) var<storage> volData: array<f32>; // array<CellInfo>
-// binding the output texture to store the ray tracing results
-@group(0) @binding(3) var outTexture: texture_storage_2d<rgba8unorm, write>;
-
-@group(0) @binding(4) var leavesTexture: texture_2d<f32>;
-@group(0) @binding(5) var dirtTexture: texture_2d<f32>;
-@group(0) @binding(6) var grassTopTexture: texture_2d<f32>;
-@group(0) @binding(7) var grassSideTexture: texture_2d<f32>;
-@group(0) @binding(8) var snowySideTexture: texture_2d<f32>;
-@group(0) @binding(9) var logTexture: texture_2d<f32>;
-@group(0) @binding(10) var logSideTexture: texture_2d<f32>;
-@group(0) @binding(11) var snowyTopTexture: texture_2d<f32>;
-@group(0) @binding(12) var stoneTexture: texture_2d<f32>;
-@group(0) @binding(13) var leafParticleTexture: texture_2d<f32>;
-@group(0) @binding(14) var particleSheet: texture_2d<f32>;
-
-
-
-// @group(0) @binding(4) var<uniform> toggleModel: f32;
-
-// a function to transform the direction to the model coordiantes
-fn transformDir(d: vec3f) -> vec3f {
-  // transform the direction using the camera pose
-  var out = applyMotorToDir(d, cameraPose.motor);
-  return out;
-}
-
-// a function to transform the start pt to the model coordiantes
-fn transformPt(pt: vec3f) -> vec3f {
-  // transform the point using the camera pose
-  var out = applyMotorToPoint(pt, cameraPose.motor);
-  return out;
-}
-
-// a function to asign the pixel color
-fn assignColor(uv: vec2i) {
-  var color: vec4f;
-  color = vec4f(0.f/255, 56.f/255, 101.f/255, 1.); // Bucknell Blue
-  textureStore(outTexture, uv, color);  
-}
-
-// a helper function to keep track of the two ray-volume hit values
-fn compareVolumeHitValues(curValue: vec2f, t: f32) -> vec2f {
+// a helper function to keep track of the two ray-box hit values
+fn compareHitValues(curValue: vec2f, t: f32) -> vec2f {
   var result = curValue;
   if (curValue.x < 0) { // no hit value yet
     result.x = t; // update the closest
@@ -343,33 +354,34 @@ fn compareVolumeHitValues(curValue: vec2f, t: f32) -> vec2f {
   return result;
 }
 
-// a helper function to compute the ray-volume hit values
-fn getVolumeHitValues(checkval: f32, halfsize: vec2f, pval: f32, dval: f32, p: vec2f, d: vec2f, curT: vec2f) -> vec2f {
+// a helper function to compute the ray-box hit values
+fn getAABBHitValues(checkval: f32, bmin: vec2f, bmax: vec2f, pval: f32, dval: f32, p: vec2f, d: vec2f, curT: vec2f) -> vec2f {
   var cur = curT;
   if (abs(dval) > EPSILON) {
     let t = (checkval - pval) / dval; // compute the current hit point to the check value
     if (t > 0) {
       let hPt = p + t * d;
-      if (-halfsize.x < hPt.x && hPt.x < halfsize.x && -halfsize.y < hPt.y && hPt.y < halfsize.y) {
-        cur = compareVolumeHitValues(cur, t);
+      if (bmin.x < hPt.x && hPt.x < bmax.x && bmin.y < hPt.y && hPt.y < bmax.y) {
+        cur = compareHitValues(cur, t);
       }
     }
   }
   return cur;
 }
 
-// a function to compute the start and end t values of the ray hitting the volume
-fn rayVolumeIntersection(p: vec3f, d: vec3f) -> vec2f {
+// a function to compute the start and end t values of the ray hitting the box
+fn rayAABBIntersection(p: vec3f, d: vec3f) -> vec2f {
   var hitValues = vec2f(-1, -1);
-  let halfsize = volInfo.dims * volInfo.sizes * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z); // 1mm
-  //let halfsize = vec3f(0.5, 0.5, 0.5) * volInfo.sizes.xyz;
   // hitPt = p + t * d => t = (hitPt - p) / d
-  hitValues = getVolumeHitValues(halfsize.z, halfsize.xy, p.z, d.z, p.xy, d.xy, hitValues); // z = halfsize.z
-  hitValues = getVolumeHitValues(-halfsize.z, halfsize.xy, p.z, d.z, p.xy, d.xy, hitValues); // z = -halfsize.z
-  hitValues = getVolumeHitValues(-halfsize.x, halfsize.yz, p.x, d.x, p.yz, d.yz, hitValues); // x = -halfsize.x
-  hitValues = getVolumeHitValues(halfsize.x, halfsize.yz, p.x, d.x, p.yz, d.yz, hitValues); // x = halfsize.x
-  hitValues = getVolumeHitValues(halfsize.y, halfsize.xz, p.y, d.y, p.xz, d.xz, hitValues); // y = halfsize.y
-  hitValues = getVolumeHitValues(-halfsize.y, halfsize.xz, p.y, d.y, p.xz, d.xz, hitValues); // y = -halfsize.y
+  let minPt = grid.minPt.xyz;
+  let maxPt = grid.minPt.xyz + grid.dims.xyz * grid.delta.xyz;
+  
+  hitValues = getAABBHitValues(maxPt.z, minPt.xy, maxPt.xy, p.z, d.z, p.xy, d.xy, hitValues); // z = maxPt.z
+  hitValues = getAABBHitValues(minPt.z, minPt.xy, maxPt.xy, p.z, d.z, p.xy, d.xy, hitValues); // z = minPt.z
+  hitValues = getAABBHitValues(minPt.x, minPt.yz, maxPt.yz, p.x, d.x, p.yz, d.yz, hitValues); // x = minPt.x
+  hitValues = getAABBHitValues(maxPt.x, minPt.yz, maxPt.yz, p.x, d.x, p.yz, d.yz, hitValues); // x = maxPt.x
+  hitValues = getAABBHitValues(maxPt.y, minPt.xz, maxPt.xz, p.y, d.y, p.xz, d.xz, hitValues); // y = maxPt.y
+  hitValues = getAABBHitValues(minPt.y, minPt.xz, maxPt.xz, p.y, d.y, p.xz, d.xz, hitValues); // y = minPt.y
   return hitValues;
 }
 
@@ -387,149 +399,98 @@ fn getNextHitValue(startT: f32, curT: f32, checkval: f32, minCorner: vec2f, maxC
   }
   return cur;
 }
-fn faceMapping(normDir: vec3f)-> i32{
-  if (all(normDir==vec3f(0,0,-1))){ // Front
-    return 0;
-  }
-  else if (all(normDir==vec3f(0,0,1))){ // Back
-    return 1;
-  }
-  else if (all(normDir==vec3f(-1,0,0))){ //Left
-    return 2;
-  }
-  else if (all(normDir==vec3f(1,0,0))){// Right
-    return 3;
-  }
-  else if (all(normDir==vec3f(0,-1,0))){// Top
-    return 4;
-  }
-  else if (all(normDir==vec3f(0,1,0))){ // Down
-    return 5;
-  }
-  else{return 0;} // Else
+
+// a helper function to get the next hit value by checking all six faces
+fn getNextHit(t: f32, minCorner: vec3f, maxCorner: vec3f, pt: vec3f, dir: vec3f) -> f32 {
+  var newT = t;
+  newT = getNextHitValue(t, newT, minCorner.x, minCorner.yz, maxCorner.yz, pt.x, dir.x, pt.yz, dir.yz);
+  newT = getNextHitValue(t, newT, maxCorner.x, minCorner.yz, maxCorner.yz, pt.x, dir.x, pt.yz, dir.yz);
+  newT = getNextHitValue(t, newT, minCorner.y, minCorner.xz, maxCorner.xz, pt.y, dir.y, pt.xz, dir.xz);
+  newT = getNextHitValue(t, newT, maxCorner.y, minCorner.xz, maxCorner.xz, pt.y, dir.y, pt.xz, dir.xz);
+  newT = getNextHitValue(t, newT, minCorner.z, minCorner.xy, maxCorner.xy, pt.z, dir.z, pt.xy, dir.xy);
+  newT = getNextHitValue(t, newT, maxCorner.z, minCorner.xy, maxCorner.xy, pt.z, dir.z, pt.xy, dir.xy);
+  return newT;
 }
-// a function to trace the volume - volume rendering
-fn traceScene(uv: vec2i, p: vec3f, d: vec3f) {
-  // find the start and end point
-  var hits = rayVolumeIntersection(p, d);
-  var color = vec4f(0.f/255, 0.f/255, 0.f/255, 1.); 
+
+// a function to trace the triangle mesh and get the color
+fn getColor(p: vec3f, d: vec3f) -> vec4f {
+  var color = vec4f(0.f/255, 56.f/255, 101.f/255, 1.);
+  
+  var hits = rayAABBIntersection(p, d);
   // if there is only one hit point, we trace from the camera center
   if (hits.y < 0 && hits.x > 0) {
     hits.y = hits.x;
     hits.x = 0;
   }
-  // assign colors
-  if (hits.x >= 0) { 
-    let diff = hits.y - hits.x;
-    color = vec4f(diff, 1 - diff, 0, 1.);
-  }
-  else {
-    color = vec4f(0.f/255, 56.f/255, 101.f/255, 1.); // Bucknell Blue
-  }
-  textureStore(outTexture, uv, color);  
-}  
-
-fn textureMapping(face: i32, hitPoint: vec3f) -> vec4f {
-  // my box has different colors for each foace
-  var color: vec4f;
-    switch(face) {
-      case 0: { //front
-        let textDim=vec2f(textureDimensions(grassSideTexture,0));
-        // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
-        color=textureLoad(grassSideTexture, vec2i((hitPoint.xy/(volInfo.sizes.xy))*textDim),0);
-        break;
+  if (hits.y > 0) { 
+    color = vec4f(0, 0, hits.y - hits.x, 1.);
+    // march the ray through the volume
+    let smallDelta = min(grid.delta.x, min(grid.delta.y, grid.delta.z)) * 0.001;
+    var t = hits.x + smallDelta; // start t
+    var minIdx = -1;
+    var normal = vec3f(0, 0, 0);
+    var weights = vec3f(0, 0, 0);
+    while (t < hits.y) { // while still inside the volume
+      let pt = p + t * d; // the current point
+      let idx = vec3f(floor((pt - grid.minPt.xyz) / grid.delta.xyz)); // compute voxel index
+      // get the triangle list
+      let offset = i32((grid.dims.x * grid.dims.y) * idx.z + grid.dims.x * idx.y + idx.x);
+      var ct = -1.;
+      for (var i = 0; i < i32(grid.delta.w); i++) {
+        let val = grid.cells[offset * i32(grid.delta.w) + i];
+        if (val >= 0) {
+          color = vec4f(0, 0.75, 0.75, 1.);
+          let tIdx = i32(val * 3);
+          let v0 = vec3f(vertices[triangles[tIdx    ]][0], vertices[triangles[tIdx    ]][1], vertices[triangles[tIdx    ]][2]);
+          let v1 = vec3f(vertices[triangles[tIdx + 1]][0], vertices[triangles[tIdx + 1]][1], vertices[triangles[tIdx + 1]][2]);
+          let v2 = vec3f(vertices[triangles[tIdx + 2]][0], vertices[triangles[tIdx + 2]][1], vertices[triangles[tIdx + 2]][2]);
+          
+          let info = triangleRayHitCheck(p, d, v0, v1, v2, ct);
+          if (info.y >= -EPSILON) {
+            ct = info.x;
+            minIdx = tIdx;
+            weights = vec3f(1 - info.z - info.w, info.z, info.w);
+          }
+        }
       }
-      case 1: { //back
-        let textDim=vec2f(textureDimensions(grassSideTexture,0));
-        // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
-        color=textureLoad(grassSideTexture, vec2i((hitPoint.xy-vec2f(-0.5))*textDim),0);
-        break;
+      if (minIdx >= 0) {
+        let n0 = vec3f(vertices[triangles[minIdx    ]][3], vertices[triangles[minIdx    ]][4], vertices[triangles[minIdx    ]][5]);
+        let n1 = vec3f(vertices[triangles[minIdx + 1]][3], vertices[triangles[minIdx + 1]][4], vertices[triangles[minIdx + 1]][5]);
+        let n2 = vec3f(vertices[triangles[minIdx + 2]][3], vertices[triangles[minIdx + 2]][4], vertices[triangles[minIdx + 2]][5]);
+        normal = normalize(weights.x * n0 + weights.y * n1 + weights.z * n2); // interpolate the normal
+        return vec4f((normal + 1) * 0.5, 1);
       }
-      case 2: { //left
-        let textDim=vec2f(textureDimensions(grassSideTexture,0));
-        color = textureLoad(grassSideTexture, vec2i((hitPoint.yz-vec2f(-0.5))*textDim),0);
-        break;
-      }
-      case 3: { //right
-        let textDim=vec2f(textureDimensions(grassSideTexture,0));
-        color = textureLoad(grassSideTexture, vec2i((hitPoint.yz-vec2f(-0.5))*textDim),0);
-        break;
-      }
-      case 4: { //top
-        let textDim=vec2f(textureDimensions(grassTopTexture,0));
-        color = textureLoad(grassTopTexture, vec2i((hitPoint.xz-vec2f(-0.5))*textDim),0);
-        break;
-      }
-      case 5: { //down
-        let textDim=vec2f(textureDimensions(dirtTexture,0));
-        color = textureLoad(dirtTexture, vec2i((hitPoint.xz-vec2f(-0.5))*textDim),0);
-        break;
-      }
-      default: {
-        color = vec4f(0.f/255, 0.f/255, 0.f/255, 1.); // Black
-        break;
-      }
+      // no hit found, move on to the next cell
+      let mincorner = grid.minPt.xyz + idx * grid.delta.xyz; // get the voxel min corner
+      let maxcorner = mincorner + grid.delta.xyz; // get the voxel max corner
+      // get the next t value
+      var newT = getNextHit(t, mincorner, maxcorner, p, d);
+      t = newT + smallDelta; // update the current t value
     }
-    return color;
   }
+  return color;
+}
 
-fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f) {
-  // find the start and end point
-  var hits = rayVolumeIntersection(p, d);
-
-
-  var curHit = hits.x + 0.02;
-
-
-  let halfSize: vec3f = volInfo.dims.xyz * volInfo.sizes.xyz * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z);
-  let voxelSize: vec3f = vec3f(1,1,1) * volInfo.sizes.xyz / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z); // normalized voxel size
-
-
-  var color = vec4f(0.f/255, 56.f/255, 101.f/255, 1.); // Bucknell Blue
-  var prevPos: vec3f;
-
-  while (curHit < hits.y) {
-    let curPt: vec3f = p + d * curHit + halfSize;
-    let vPos = curPt / voxelSize;
-    var minCorner = floor(vPos);
-    var maxCorner = ceil(vPos);
-    // var currentHit=curHit;
-
-    if (all(vPos >= vec3f(0)) && all(vPos < volInfo.dims.xyz)) {
-      let vIdx: i32 = i32(vPos.z) * i32(volInfo.dims.x * volInfo.dims.y)
-                      + i32(vPos.y) * i32(volInfo.dims.x)
-                      + i32(vPos.x);
-      if (i32(volData[vIdx]) != 0) {
-        var currFace=faceMapping(vPos-prevPos);
-        if (volData[vIdx] < volInfo.dims.y * 0.1) {
-          color = vec4f(255.f/255, 250.f/255, 250.f/255, 1.); // Snow
-        }
-        else if (volData[vIdx] < volInfo.dims.y * 0.35) {
-          color = textureMapping(currFace, curPt); // Mountain
-          // color = vec4f(170.f/255, 170.f/255, 0.f/255, 1.); // Grass
-        }
-        else if (volData[vIdx] < volInfo.dims.y * 0.6) {
-          color = vec4f(0.f/255, 170.f/255, 0.f/255, 1.); // Grass
-        }
-        else {
-          color = vec4f(96.f/255, 177.f/255, 199.f/255, 1.); // Water
-        }
-        break;
-      }
-    }
-    // If we don't hit anything
-    else{
-      curHit = getNextHitValue(hits.x, curHit, minCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy); // xy
-      curHit = getNextHitValue(hits.x, curHit, maxCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy);
-      curHit = getNextHitValue(hits.x, curHit, minCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz); // yz
-      curHit = getNextHitValue(hits.x, curHit, maxCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz);
-      curHit = getNextHitValue(hits.x, curHit, minCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz); // xz
-      curHit = getNextHitValue(hits.x, curHit, maxCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz);
-      prevPos = vPos;
-    }
-    curHit += 0.002;
+@compute
+@workgroup_size(16, 16)
+fn computeOrthogonalMain(@builtin(global_invocation_id) global_id: vec3u) {
+  // get the pixel coordiantes
+  let uv = vec2i(global_id.xy);
+  let texDim = vec2i(textureDimensions(outTexture));
+  if (uv.x < texDim.x && uv.y < texDim.y) {
+    // compute the pixel size
+    let psize = vec2f(2, 2) / cameraPose.res.xy;
+    // orthogonal camera ray sent from each pixel center at z = 0
+    var spt = vec3f((f32(uv.x) + 0.5) * psize.x - 1, (f32(uv.y) + 0.5) * psize.y - 1, 0);
+    var rdir = vec3f(0, 0, 1);
+    // apply transformation
+    spt = applyMotorToPoint(spt, cameraPose.motor);
+    rdir = applyMotorToDir(rdir, cameraPose.motor);
+    // compute the intersection to the object
+    var color = getColor(spt, rdir);
+    // assign colors
+    textureStore(outTexture, uv, color);  
   }
-  textureStore(outTexture, uv, color);
 }
 
 @compute
@@ -540,69 +501,17 @@ fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u) {
   let texDim = vec2i(textureDimensions(outTexture));
   if (uv.x < texDim.x && uv.y < texDim.y) {
     // compute the pixel size
-    let psize = vec2f(2, 2) / cameraPose.res.xy * cameraPose.focal.xy;
-    // orthogonal camera ray sent from each pixel center at z = 0
+    let psize = vec2f(2, 2) / cameraPose.res * cameraPose.focal;
+    // projective camera ray sent from the camera center to the pixel center
     var spt = vec3f(0, 0, 0);
-    var rdir = vec3f((f32(uv.x) + 0.5) * psize.x - cameraPose.focal.x, (f32(uv.y) + 0.5) * psize.y - cameraPose.focal.y, 1);
+    var pixel = vec3f((f32(uv.x) + 0.5) * psize.x - cameraPose.focal.x, (f32(uv.y) + 0.5) * psize.y - cameraPose.focal.y, 1);
+    var rdir = normalize(pixel);
     // apply transformation
-    spt = transformPt(spt);
-    rdir = transformDir(rdir);
-
-    // var hitInfo = rayBoxIntersection(spt, rdir);
-    // var hitPt = spt + rdir * hitInfo.x;
-    // hitPt = transformHitPoint(hitPt);
-    // var diffuse = boxDiffuseColor(i32(hitInfo.y), hitPt);
-    // trace scene
-    // traceScene(uv, spt, rdir);
-    traceTerrain(uv, spt, rdir);
+    spt = applyMotorToPoint(spt, cameraPose.motor);
+    rdir = applyMotorToDir(rdir, cameraPose.motor);
+    // compute the intersection to the object
+    var color = getColor(spt, rdir);
+    // assign colors
+    textureStore(outTexture, uv, color);  
   }
-// @compute
-// @workgroup_size(16, 16)
-// fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u) {
-//   // get the pixel coordiantes
-//   let uv = vec2i(global_id.xy);
-//   let texDim = vec2i(textureDimensions(outTexture));
-//   if (uv.x < texDim.x && uv.y < texDim.y) {
-//     // compute the pixel size
-//     let psize = vec2f(2, 2) / cameraPose.res.xy * cameraPose.focal.xy;
-//     // orthogonal camera ray sent from each pixel center at z = 0
-//     var startSpt = vec3f(0, 0, 0);
-//     var startRDir = normalize(vec3f((f32(uv.x) + 0.5) * psize.x - cameraPose.focal.x, (f32(uv.y) + 0.5) * psize.y - cameraPose.focal.y, 1));
-
-//     var spt=vec3f(0,0,0);
-//     var rdir=vec3f(0,0,0);
-//     var hitInfo=vec2f(1000000,0);
-//     var goodBox=0;
-//     // apply transformation
-//     for (var i=0 ; i<2; i+=1){
-//       var currSpt = transformPt(startSpt, box[i]); ///
-//       var currRDir = transformDir(startRDir,box[i]);///
-//       // compute the intersection to the object
-//       var currHitInfo = rayBoxIntersection(currSpt, currRDir, box[i]);///
-//       if (hitInfo.x==0) {
-//         spt=currSpt;
-//         rdir=currRDir;
-//         hitInfo=currHitInfo;
-//         goodBox=i;
-//       }
-//       else if ((currHitInfo.x < hitInfo.x) && currHitInfo.x != -1) {
-//         spt=currSpt;
-//         rdir=currRDir;
-//         hitInfo=currHitInfo;
-//         goodBox=i;
-//       }
-//     }
-//     // assign colors
-//     var color = vec4f(0.f/255, 56.f/255, 101.f/255, 1.); // Bucknell Blue
-//     if (hitInfo.x > 0) { 
-//       let emit = boxEmitColor(); 
-//       var hitPt = spt + rdir * hitInfo.x;
-//       hitPt = transformHitPoint(hitPt,box[goodBox]);
-//       var diffuse = boxDiffuseColor(i32(hitInfo.y), hitPt,goodBox);
-//       var normal = boxNormal(i32(hitInfo.y),hitPt,goodBox);
-//       normal = transformNormal(normal, box[goodBox])
-//       // LAMBERTIAN MODEL
-//       color = emit + diffuse;
-//     textureStore(outTexture, uv, color); 
-//   }
 }
