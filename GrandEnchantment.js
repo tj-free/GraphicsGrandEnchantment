@@ -95,7 +95,7 @@ async function init() {
                                         'N: Change Light Model: ' + models[tracerObj._currModel[1]]+"\n"+
                                         '1: Change Weather Light: ' + weatherLight[tracerObj._currModel[2]]
                                       );
-  var rotatespeed = 2;
+  var rotatespeed = 1;
   var movespeed= 0.05;
   var focalXSpeed = 0.1;
   var focalYSpeed = 0.1;
@@ -252,6 +252,94 @@ async function init() {
 
       }
   });
+
+  var mouseX = 0;
+  var mouseY = 0;
+  // TODO: implemnt the mousemove function to track the mouse position
+  // canvasTag.addEventListener('mousemove', (e) => {
+
+  //   mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+  //   mouseY = (-e.clientY / window.innerHeight) * 2 + 1;
+  //   console.log(`mouse position (${mouseX}, ${mouseY})`);
+  //   var pos = [mouseX, mouseY]
+
+  //   var maxDir = Math.max(Math.abs(mouseX), Math.abs(mouseY))
+
+  //   //check if mousemovement in X direction
+  //   if (maxDir == Math.abs(mouseX)){
+  //     if (mouseX < 0) {
+  //       camera.rotateY(rotatespeed);
+  //       tracerObj.updateCameraPose();
+  //     }
+  //     else{
+  //       camera.rotateY(-rotatespeed);
+  //       tracerObj.updateCameraPose();
+  //     }
+  //   }
+  //   //check if mousemovement in Ydirection
+  //   else if (maxDir == Math.abs(mouseY)){
+  //     if (mouseY < 0) {
+  //       camera.rotateX(rotatespeed);
+  //       tracerObj.updateCameraPose();
+  //     }
+  //     else{
+  //       camera.rotateX(-rotatespeed);
+  //       tracerObj.updateCameraPose();
+  //     }
+  //   }
+
+  // });
+
+var x = 50;
+var y = 50;
+  
+  // Testing Mouse Point Lock -------------------------
+    canvasTag.addEventListener("click", async () => {
+      if(!document.pointerLockElement) {
+        try {
+          await canvasTag.requestPointerLock({
+            unadjustedMovement: true,
+          });
+        } catch (error) {
+          if (error.name === "NotSupportedError") {
+            // Some platforms may not support unadjusted movement.
+            await canvasTag.requestPointerLock();
+          } else {
+            throw error;
+          }
+        }
+      }
+    });
+    
+    // pointer lock event listeners for mouse movement to look around
+    document.addEventListener("pointerlockchange", lockChangeAlert, false);
+    
+    function lockChangeAlert() {
+      if (document.pointerLockElement === canvasTag) {
+        console.log("The pointer lock status is now locked");
+        document.addEventListener("mousemove", updatePosition, false);
+      } else {
+        console.log("The pointer lock status is now unlocked");
+        document.removeEventListener("mousemove", updatePosition, false);
+      }
+    }
+    
+    const tracker = document.getElementById("tracker");
+
+      console.log(`X position: ${x}, Y position: ${y}`);
+
+    function updatePosition(e) {
+      const sensitivity = 0.05; // tune this based on feel
+      const deltaX = e.movementX;
+      const deltaY = e.movementY;
+      
+      // Rotate camera horizontally (Y-axis) and vertically (X-axis)
+      camera.rotateY(-deltaX * sensitivity);
+      camera.rotateX(deltaY * sensitivity);
+
+      tracerObj.updateCameraPose(); // your own method to sync visuals
+    
+    }
   
   // run animation at 60 fps
   var frameCnt = 0;
