@@ -32,6 +32,7 @@ import VRRayTracer from './lib/Viz/VRRayTracer.js'
 import StandardTextObject from './lib/DSViz/StandardTextObject.js'
 import VolumeRenderingSimpleObject from './lib/DSViz/VolumeRenderingSimpleObject.js'
 import Camera from './lib/Viz/3DCamera.js'
+import VRInput from './lib/Input/VRInput.js';
 
 async function init() {
   // Create a canvas tag
@@ -56,6 +57,8 @@ async function init() {
   var tracerObj= new VolumeRenderingSimpleObject(tracer._device, tracer._canvasFormat,
   camera, true, blockTextures.concat(particleTextures));
   
+  var vrInput = new VRInput();
+
   await tracer.setTracerObject(tracerObj);
  
   let toggleMovement=true;
