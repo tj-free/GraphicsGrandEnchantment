@@ -253,43 +253,6 @@ async function init() {
       }
   });
 
-  var mouseX = 0;
-  var mouseY = 0;
-  // TODO: implemnt the mousemove function to track the mouse position
-  // canvasTag.addEventListener('mousemove', (e) => {
-
-  //   mouseX = (e.clientX / window.innerWidth) * 2 - 1;
-  //   mouseY = (-e.clientY / window.innerHeight) * 2 + 1;
-  //   console.log(`mouse position (${mouseX}, ${mouseY})`);
-  //   var pos = [mouseX, mouseY]
-
-  //   var maxDir = Math.max(Math.abs(mouseX), Math.abs(mouseY))
-
-  //   //check if mousemovement in X direction
-  //   if (maxDir == Math.abs(mouseX)){
-  //     if (mouseX < 0) {
-  //       camera.rotateY(rotatespeed);
-  //       tracerObj.updateCameraPose();
-  //     }
-  //     else{
-  //       camera.rotateY(-rotatespeed);
-  //       tracerObj.updateCameraPose();
-  //     }
-  //   }
-  //   //check if mousemovement in Ydirection
-  //   else if (maxDir == Math.abs(mouseY)){
-  //     if (mouseY < 0) {
-  //       camera.rotateX(rotatespeed);
-  //       tracerObj.updateCameraPose();
-  //     }
-  //     else{
-  //       camera.rotateX(-rotatespeed);
-  //       tracerObj.updateCameraPose();
-  //     }
-  //   }
-
-  // });
-
 var x = 50;
 var y = 50;
   
