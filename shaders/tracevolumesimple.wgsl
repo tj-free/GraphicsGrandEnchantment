@@ -442,17 +442,17 @@ fn textureMapping(face: i32, hitPoint: vec3f) -> vec4f {
       case 1: { //back
         let textDim=vec2f(textureDimensions(grassSideTexture,0));
         // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
-        color=textureLoad(grassSideTexture, vec2i((hitPoint.xy-vec2f(-0.5))*textDim),0);
+        color=textureLoad(grassSideTexture, vec2i((hitPoint.xy/(volInfo.sizes.xy))*textDim),0);
         break;
       }
       case 2: { //left
         let textDim=vec2f(textureDimensions(grassSideTexture,0));
-        color = textureLoad(grassSideTexture, vec2i((hitPoint.yz-vec2f(-0.5))*textDim),0);
+        color = textureLoad(grassSideTexture, vec2i((hitPoint.yz/(volInfo.sizes.yz))*textDim),0);
         break;
       }
       case 3: { //right
         let textDim=vec2f(textureDimensions(grassSideTexture,0));
-        color = textureLoad(grassSideTexture, vec2i((hitPoint.yz-vec2f(-0.5))*textDim),0);
+        color = textureLoad(grassSideTexture, vec2i((hitPoint.yz/(volInfo.sizes.yz))*textDim),0);
         break;
       }
       case 4: { //top
