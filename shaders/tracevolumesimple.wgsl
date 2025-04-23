@@ -275,49 +275,42 @@ struct CellInfo { // this is packed in 64
 }
 
 // binding the camera pose
-@group(0) @binding(0) var<uniform> cameraPose: Camera ;
+@group(0) @binding(0) var<uniform> cameraPose: array<Camera, 2>;
 // binding the volume info
 @group(0) @binding(1) var<uniform> volInfo: VolInfo;
 // binding the volume data
 @group(0) @binding(2) var<storage> volData: array<f32>; // array<CellInfo>
 // binding the output texture to store the ray tracing results
-@group(0) @binding(3) var outTexture: texture_storage_2d<rgba8unorm, write>;
-
-@group(0) @binding(4) var leavesTexture: texture_2d<f32>;
-@group(0) @binding(5) var dirtTexture: texture_2d<f32>;
-@group(0) @binding(6) var grassTopTexture: texture_2d<f32>;
-@group(0) @binding(7) var grassSideTexture: texture_2d<f32>;
-@group(0) @binding(8) var snowySideTexture: texture_2d<f32>;
-@group(0) @binding(9) var logTexture: texture_2d<f32>;
-@group(0) @binding(10) var logSideTexture: texture_2d<f32>;
-@group(0) @binding(11) var snowyTopTexture: texture_2d<f32>;
-@group(0) @binding(12) var stoneTexture: texture_2d<f32>;
-@group(0) @binding(13) var leafParticleTexture: texture_2d<f32>;
-@group(0) @binding(14) var particleSheet: texture_2d<f32>;
+@group(0) @binding(3) var outTextureLeft: texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(4) var outTextureRight: texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(5) var leavesTexture: texture_2d<f32>;
+@group(0) @binding(6) var dirtTexture: texture_2d<f32>;
+@group(0) @binding(7) var grassTopTexture: texture_2d<f32>;
+@group(0) @binding(8) var grassSideTexture: texture_2d<f32>;
+@group(0) @binding(9) var snowySideTexture: texture_2d<f32>;
+@group(0) @binding(10) var logTexture: texture_2d<f32>;
+@group(0) @binding(11) var logSideTexture: texture_2d<f32>;
+@group(0) @binding(12) var snowyTopTexture: texture_2d<f32>;
+@group(0) @binding(13) var stoneTexture: texture_2d<f32>;
+@group(0) @binding(14) var leafParticleTexture: texture_2d<f32>;
+@group(0) @binding(15) var particleSheet: texture_2d<f32>;
 
 
 
 // @group(0) @binding(4) var<uniform> toggleModel: f32;
 
 // a function to transform the direction to the model coordiantes
-fn transformDir(d: vec3f) -> vec3f {
+fn transformDir(d: vec3f, cameraId: u32) -> vec3f {
   // transform the direction using the camera pose
-  var out = applyMotorToDir(d, cameraPose.motor);
+  var out = applyMotorToDir(d, cameraPose[cameraId].motor);
   return out;
 }
 
 // a function to transform the start pt to the model coordiantes
-fn transformPt(pt: vec3f) -> vec3f {
+fn transformPt(pt: vec3f, cameraId: u32) -> vec3f {
   // transform the point using the camera pose
-  var out = applyMotorToPoint(pt, cameraPose.motor);
+  var out = applyMotorToPoint(pt, cameraPose[cameraId].motor);
   return out;
-}
-
-// a function to asign the pixel color
-fn assignColor(uv: vec2i) {
-  var color: vec4f;
-  color = vec4f(0.f/255, 56.f/255, 101.f/255, 1.); // Bucknell Blue
-  textureStore(outTexture, uv, color);  
 }
 
 // a helper function to keep track of the two ray-volume hit values
@@ -388,27 +381,6 @@ fn getNextHitValue(startT: f32, curT: f32, checkval: f32, minCorner: vec2f, maxC
   return cur;
 }
 
-// a function to trace the volume - volume rendering
-fn traceScene(uv: vec2i, p: vec3f, d: vec3f) {
-  // find the start and end point
-  var hits = rayVolumeIntersection(p, d);
-  var color = vec4f(0.f/255, 0.f/255, 0.f/255, 1.); 
-  // if there is only one hit point, we trace from the camera center
-  if (hits.y < 0 && hits.x > 0) {
-    hits.y = hits.x;
-    hits.x = 0;
-  }
-  // assign colors
-  if (hits.x >= 0) { 
-    let diff = hits.y - hits.x;
-    color = vec4f(diff, 1 - diff, 0, 1.);
-  }
-  else {
-    color = vec4f(0.f/255, 56.f/255, 101.f/255, 1.); // Bucknell Blue
-  }
-  textureStore(outTexture, uv, color);  
-}
-
 // fn boxDiffuseColor(idx: i32, hitPoint: vec3f) -> vec4f {
 //   // my box has different colors for each foace
 //   var color: vec4f;
@@ -450,7 +422,7 @@ fn traceScene(uv: vec2i, p: vec3f, d: vec3f) {
 // }
 
 
-fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f) {
+fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
   // find the start and end point
   var hits = rayVolumeIntersection(p, d);
 
@@ -462,7 +434,7 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f) {
   let voxelSize: vec3f = vec3f(1,1,1) * volInfo.sizes.xyz / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z); // normalized voxel size
 
 
-  var color = vec4f(0.f/255, 56.f/255, 101.f/255, 1.); // Bucknell Blue
+  var color = vec4f(0.f/255, 70.f/255, 140.f/255, 1.); // Bucknell Blue
   while (curHit < hits.y) {
     let curPt: vec3f = p + d * curHit + halfSize;
 
@@ -498,80 +470,39 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f) {
     }
     curHit += 0.002;
   }
-  textureStore(outTexture, uv, color);
+  // textureStore(outTextureRight, uv, color);
+  // TODO: Fix the right texture not texturing
+  if (cameraId == 0) {
+    textureStore(outTextureLeft, uv, color);
+  }
+  else {
+    textureStore(outTextureRight, uv, color);
+  }
 }
 
 @compute
-@workgroup_size(16, 16)
-fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u) {
+@workgroup_size(11, 11, 2)
+fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u, @builtin(workgroup_id) workgroup_id: vec3u) {
+  let cameraId = workgroup_id.z;
   // get the pixel coordiantes
   let uv = vec2i(global_id.xy);
-  let texDim = vec2i(textureDimensions(outTexture));
+  var texDim: vec2i;
+  if (cameraId == 0) {
+    texDim = vec2i(textureDimensions(outTextureLeft));
+  }
+  else {
+    texDim = vec2i(textureDimensions(outTextureRight));
+  }
   if (uv.x < texDim.x && uv.y < texDim.y) {
     // compute the pixel size
-    let psize = vec2f(2, 2) / cameraPose.res.xy * cameraPose.focal.xy;
+    let psize = vec2f(2, 2) / cameraPose[cameraId].res.xy * cameraPose[cameraId].focal.xy;
     // orthogonal camera ray sent from each pixel center at z = 0
     var spt = vec3f(0, 0, 0);
-    var rdir = vec3f((f32(uv.x) + 0.5) * psize.x - cameraPose.focal.x, (f32(uv.y) + 0.5) * psize.y - cameraPose.focal.y, 1);
+    var rdir = vec3f((f32(uv.x) + 0.5) * psize.x - cameraPose[cameraId].focal.x, (f32(uv.y) + 0.5) * psize.y - cameraPose[cameraId].focal.y, 1);
     // apply transformation
-    spt = transformPt(spt);
-    rdir = transformDir(rdir);
+    spt = transformPt(spt, cameraId);
+    rdir = transformDir(rdir, cameraId);
 
-    // var hitInfo = rayBoxIntersection(spt, rdir);
-    // var hitPt = spt + rdir * hitInfo.x;
-    // hitPt = transformHitPoint(hitPt);
-    // var diffuse = boxDiffuseColor(i32(hitInfo.y), hitPt);
-    // trace scene
-    // traceScene(uv, spt, rdir);
-    traceTerrain(uv, spt, rdir);
+    traceTerrain(uv, spt, rdir, cameraId);
   }
-// @compute
-// @workgroup_size(16, 16)
-// fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u) {
-//   // get the pixel coordiantes
-//   let uv = vec2i(global_id.xy);
-//   let texDim = vec2i(textureDimensions(outTexture));
-//   if (uv.x < texDim.x && uv.y < texDim.y) {
-//     // compute the pixel size
-//     let psize = vec2f(2, 2) / cameraPose.res.xy * cameraPose.focal.xy;
-//     // orthogonal camera ray sent from each pixel center at z = 0
-//     var startSpt = vec3f(0, 0, 0);
-//     var startRDir = normalize(vec3f((f32(uv.x) + 0.5) * psize.x - cameraPose.focal.x, (f32(uv.y) + 0.5) * psize.y - cameraPose.focal.y, 1));
-
-//     var spt=vec3f(0,0,0);
-//     var rdir=vec3f(0,0,0);
-//     var hitInfo=vec2f(1000000,0);
-//     var goodBox=0;
-//     // apply transformation
-//     for (var i=0 ; i<2; i+=1){
-//       var currSpt = transformPt(startSpt, box[i]); ///
-//       var currRDir = transformDir(startRDir,box[i]);///
-//       // compute the intersection to the object
-//       var currHitInfo = rayBoxIntersection(currSpt, currRDir, box[i]);///
-//       if (hitInfo.x==0) {
-//         spt=currSpt;
-//         rdir=currRDir;
-//         hitInfo=currHitInfo;
-//         goodBox=i;
-//       }
-//       else if ((currHitInfo.x < hitInfo.x) && currHitInfo.x != -1) {
-//         spt=currSpt;
-//         rdir=currRDir;
-//         hitInfo=currHitInfo;
-//         goodBox=i;
-//       }
-//     }
-//     // assign colors
-//     var color = vec4f(0.f/255, 56.f/255, 101.f/255, 1.); // Bucknell Blue
-//     if (hitInfo.x > 0) { 
-//       let emit = boxEmitColor(); 
-//       var hitPt = spt + rdir * hitInfo.x;
-//       hitPt = transformHitPoint(hitPt,box[goodBox]);
-//       var diffuse = boxDiffuseColor(i32(hitInfo.y), hitPt,goodBox);
-//       var normal = boxNormal(i32(hitInfo.y),hitPt,goodBox);
-//       normal = transformNormal(normal, box[goodBox])
-//       // LAMBERTIAN MODEL
-//       color = emit + diffuse;
-//     textureStore(outTexture, uv, color); 
-//   }
 }

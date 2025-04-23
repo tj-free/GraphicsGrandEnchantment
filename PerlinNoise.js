@@ -45,9 +45,9 @@ async function init() {
   document.body.appendChild(xrButton);
 
   // Create a ray tracer
-  var camera = new Camera();
-  camera.moveZ(-1);
-  const tracer = new VRRayTracer(canvasTag, camera);
+  var leftCamera = new Camera();
+  var rightCamera = new Camera();
+  const tracer = new VRRayTracer(canvasTag);
   await tracer.init();
   // Create a 3D Camera
   // Create an object to trace
@@ -55,12 +55,21 @@ async function init() {
   var particleTextures=["./assets/textures/particles/pale_oak_leaves_atlas.png","./assets/textures/particles/particles.png"]
 
   var tracerObj= new VolumeRenderingSimpleObject(tracer._device, tracer._canvasFormat,
-  camera, true, blockTextures.concat(particleTextures));
+  [leftCamera, rightCamera], true, blockTextures.concat(particleTextures));
   
   var vrInput = new VRInput();
 
   await tracer.setTracerObject(tracerObj);
  
+  leftCamera.moveZ(-2);
+  leftCamera.moveY(0.5);
+  leftCamera.moveX(0.0298200368);
+  leftCamera.moveX(0.25);
+  rightCamera.moveZ(-2);
+  rightCamera.moveY(0.5);
+  // rightCamera.moveX(-0.0298200368);
+  rightCamera.moveX(-0.25);
+  
   let toggleMovement=true;
   
   let fps = '??';
@@ -83,72 +92,92 @@ async function init() {
   var focalYSpeed = 0.1;
   document.addEventListener('keydown', async (e) => {
     switch (e.key) {
+      case 'g':
+        tracer.switchCamera(0)
+        tracerObj.updateCameraPose();
+        break;
+      case 'h':
+        tracer.switchCamera(1)
+        tracerObj.updateCameraPose();
+        break;
       case 'w': case 'W':
-        camera.moveZ(movespeed);
+        leftCamera.moveZ(movespeed);
+        rightCamera.moveZ(movespeed);
         tracerObj.updateCameraPose();
         break;
       case 'a': case 'A':
-        camera.moveX(-movespeed);
+        leftCamera.moveX(-movespeed);
+        rightCamera.moveX(-movespeed);
         tracerObj.updateCameraPose();
         break;
       case 's': case 'S':
-        camera.moveZ(-movespeed);
+        leftCamera.moveZ(-movespeed);
+        rightCamera.moveZ(-movespeed);
         tracerObj.updateCameraPose();
         break;
       case 'd': case 'D':
-        camera.moveX(movespeed);
+        leftCamera.moveX(movespeed);
+        rightCamera.moveX(movespeed);
         tracerObj.updateCameraPose();
         break;
       case ' ':
-        camera.moveY(-movespeed);
+        leftCamera.moveY(-movespeed);
+        rightCamera.moveY(-movespeed);
         tracerObj.updateCameraPose();
         break;
       case 'Shift':
-        camera.moveY(movespeed);
+        leftCamera.moveY(movespeed);
+        rightCamera.moveY(movespeed);
         tracerObj.updateCameraPose();
         break;
       case 'q': case 'Q':
-        camera.rotateZ(rotatespeed);
+        leftCamera.rotateZ(rotatespeed);
+        rightCamera.rotateZ(rotatespeed);
         tracerObj.updateCameraPose();
         break;
       case 'e': case'E':
-        camera.rotateZ(-rotatespeed);
+        leftCamera.rotateZ(-rotatespeed);
+        rightCamera.rotateZ(-rotatespeed);
         tracerObj.updateCameraPose();
         break;
       case 'ArrowUp':
-        camera.rotateX(-rotatespeed);
+        leftCamera.rotateX(-rotatespeed);
+        rightCamera.rotateX(-rotatespeed);
         tracerObj.updateCameraPose();
         break;
       case 'ArrowLeft':
-        camera.rotateY(rotatespeed);
+        leftCamera.rotateY(rotatespeed);
+        rightCamera.rotateY(rotatespeed);
         tracerObj.updateCameraPose();
         break;
       case 'ArrowDown':
-        camera.rotateX(rotatespeed);
+        leftCamera.rotateX(rotatespeed);
+        rightCamera.rotateX(rotatespeed);
         tracerObj.updateCameraPose();
         break;
       case 'ArrowRight':
-        camera.rotateY(-rotatespeed);
+        leftCamera.rotateY(-rotatespeed);
+        rightCamera.rotateY(-rotatespeed);
         tracerObj.updateCameraPose();
         break;
-      case 't': case 'T':
-        // console.log("Button Press")
-        camera.toggleProjective();
-        break;
       case '-':
-        camera.changeFocalX(focalXSpeed);
+        leftCamera.changeFocalX(focalXSpeed);
+        rightCamera.changeFocalX(focalXSpeed);
         tracerObj.updateCameraFocal();
         break;
       case '=':
-        camera.changeFocalX(-focalXSpeed);
+        leftCamera.changeFocalX(-focalXSpeed);
+        rightCamera.changeFocalX(-focalXSpeed);
         tracerObj.updateCameraFocal();
         break;
       case '[':
-        camera.changeFocalY(focalYSpeed);
+        leftCamera.changeFocalY(focalYSpeed);
+        rightCamera.changeFocalY(focalYSpeed);
         tracerObj.updateCameraFocal();
         break;
       case ']':
-        camera.changeFocalY(-focalYSpeed);
+        leftCamera.changeFocalY(-focalYSpeed);
+        rightCamera.changeFocalY(-focalYSpeed);
         tracerObj.updateCameraFocal();
         break;
       case "u": case "U":
