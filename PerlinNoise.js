@@ -75,7 +75,7 @@ async function init() {
                                           'U: Toggle Camera/Object\n'+
                                           'B: Toggle Models');
   var movespeed = 0.05;
-  var rotatespeed = 2;
+  var rotatespeed = 0.5;
   var focalXSpeed = 0.1;
   var focalYSpeed = 0.1;
   document.addEventListener('keydown', async (e) => {
@@ -129,7 +129,6 @@ async function init() {
         tracerObj.updateCameraPose();
         break;
       case 't': case 'T':
-        // console.log("Button Press")
         camera.toggleProjective();
         break;
       case '-':
