@@ -63,12 +63,16 @@ async function init() {
  
   leftCamera.moveZ(-2);
   leftCamera.moveY(0.5);
-  leftCamera.moveX(0.0298200368);
-  leftCamera.moveX(0.25);
+  // NOTE: cameras need to be rotated?
+  // How do humans see
+  // leftCamera.moveX(0.0298200368);
+  leftCamera.moveX(-0.008);
+  leftCamera.rotateY(5);
   rightCamera.moveZ(-2);
   rightCamera.moveY(0.5);
   // rightCamera.moveX(-0.0298200368);
-  rightCamera.moveX(-0.25);
+  rightCamera.moveX(0.008);
+  rightCamera.rotateY(-5);
   
   let toggleMovement=true;
   
