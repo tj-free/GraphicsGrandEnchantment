@@ -406,7 +406,7 @@ fn faceMapping(normDir: vec3f)-> i32{
   else if (all(normDir==vec3f(0,1,0))){ // Down
     return 5;
   }
-  else{return 0;} // Else
+  else{return 4;} // Else
 }
 // a function to trace the volume - volume rendering
 fn traceScene(uv: vec2i, p: vec3f, d: vec3f) {
@@ -430,7 +430,7 @@ fn traceScene(uv: vec2i, p: vec3f, d: vec3f) {
 }  
 
 fn textureMapping(face: i32, hitPoint: vec3f) -> vec4f {
-  // my box has different colors for each foace
+  // my box has different colors for each face
   var color: vec4f;
     switch(face) {
       case 0: { //front
@@ -457,7 +457,7 @@ fn textureMapping(face: i32, hitPoint: vec3f) -> vec4f {
       }
       case 4: { //top
         let textDim=vec2f(textureDimensions(grassTopTexture,0));
-        color = textureLoad(grassTopTexture, vec2i((hitPoint.xz-vec2f(-0.5))*textDim),0);
+        color = textureLoad(grassTopTexture, vec2i((hitPoint.xz/(volInfo.sizes.xz))*textDim),0);
         break;
       }
       case 5: { //down
@@ -490,10 +490,9 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f) {
 
   while (curHit < hits.y) {
     let curPt: vec3f = p + d * curHit + halfSize;
-    let vPos = curPt / voxelSize;
+    let vPos = curPt / (voxelSize);
     var minCorner = floor(vPos);
     var maxCorner = ceil(vPos);
-    // var currentHit=curHit;
 
     if (all(vPos >= vec3f(0)) && all(vPos < volInfo.dims.xyz)) {
       let vIdx: i32 = i32(vPos.z) * i32(volInfo.dims.x * volInfo.dims.y)
@@ -502,7 +501,8 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f) {
       if (i32(volData[vIdx]) != 0) {
         var currFace=faceMapping(vPos-prevPos);
         if (volData[vIdx] < volInfo.dims.y * 0.1) {
-          color = vec4f(255.f/255, 250.f/255, 250.f/255, 1.); // Snow
+          // color = vec4f(255.f/255, 250.f/255, 250.f/255, 1.); // Snow
+          color = textureMapping(currFace, curPt);
         }
         else if (volData[vIdx] < volInfo.dims.y * 0.35) {
           color = textureMapping(currFace, curPt); // Mountain
@@ -548,61 +548,6 @@ fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u) {
     spt = transformPt(spt);
     rdir = transformDir(rdir);
 
-    // var hitInfo = rayBoxIntersection(spt, rdir);
-    // var hitPt = spt + rdir * hitInfo.x;
-    // hitPt = transformHitPoint(hitPt);
-    // var diffuse = boxDiffuseColor(i32(hitInfo.y), hitPt);
-    // trace scene
-    // traceScene(uv, spt, rdir);
     traceTerrain(uv, spt, rdir);
   }
-// @compute
-// @workgroup_size(16, 16)
-// fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u) {
-//   // get the pixel coordiantes
-//   let uv = vec2i(global_id.xy);
-//   let texDim = vec2i(textureDimensions(outTexture));
-//   if (uv.x < texDim.x && uv.y < texDim.y) {
-//     // compute the pixel size
-//     let psize = vec2f(2, 2) / cameraPose.res.xy * cameraPose.focal.xy;
-//     // orthogonal camera ray sent from each pixel center at z = 0
-//     var startSpt = vec3f(0, 0, 0);
-//     var startRDir = normalize(vec3f((f32(uv.x) + 0.5) * psize.x - cameraPose.focal.x, (f32(uv.y) + 0.5) * psize.y - cameraPose.focal.y, 1));
-
-//     var spt=vec3f(0,0,0);
-//     var rdir=vec3f(0,0,0);
-//     var hitInfo=vec2f(1000000,0);
-//     var goodBox=0;
-//     // apply transformation
-//     for (var i=0 ; i<2; i+=1){
-//       var currSpt = transformPt(startSpt, box[i]); ///
-//       var currRDir = transformDir(startRDir,box[i]);///
-//       // compute the intersection to the object
-//       var currHitInfo = rayBoxIntersection(currSpt, currRDir, box[i]);///
-//       if (hitInfo.x==0) {
-//         spt=currSpt;
-//         rdir=currRDir;
-//         hitInfo=currHitInfo;
-//         goodBox=i;
-//       }
-//       else if ((currHitInfo.x < hitInfo.x) && currHitInfo.x != -1) {
-//         spt=currSpt;
-//         rdir=currRDir;
-//         hitInfo=currHitInfo;
-//         goodBox=i;
-//       }
-//     }
-//     // assign colors
-//     var color = vec4f(0.f/255, 56.f/255, 101.f/255, 1.); // Bucknell Blue
-//     if (hitInfo.x > 0) { 
-//       let emit = boxEmitColor(); 
-//       var hitPt = spt + rdir * hitInfo.x;
-//       hitPt = transformHitPoint(hitPt,box[goodBox]);
-//       var diffuse = boxDiffuseColor(i32(hitInfo.y), hitPt,goodBox);
-//       var normal = boxNormal(i32(hitInfo.y),hitPt,goodBox);
-//       normal = transformNormal(normal, box[goodBox])
-//       // LAMBERTIAN MODEL
-//       color = emit + diffuse;
-//     textureStore(outTexture, uv, color); 
-//   }
 }
