@@ -401,26 +401,6 @@ fn faceMapping(normDir: vec3f)-> i32{
   }
   else{return 4;} // Else
 }
-// a function to trace the volume - volume rendering
-fn traceScene(uv: vec2i, p: vec3f, d: vec3f) {
-  // find the start and end point
-  var hits = rayVolumeIntersection(p, d);
-  var color = vec4f(0.f/255, 0.f/255, 0.f/255, 1.); 
-  // if there is only one hit point, we trace from the camera center
-  if (hits.y < 0 && hits.x > 0) {
-    hits.y = hits.x;
-    hits.x = 0;
-  }
-  // assign colors
-  if (hits.x >= 0) { 
-    let diff = hits.y - hits.x;
-    color = vec4f(diff, 1 - diff, 0, 1.);
-  }
-  else {
-    color = vec4f(0.f/255, 56.f/255, 101.f/255, 1.); // Bucknell Blue
-  }
-  textureStore(outTexture, uv, color);  
-}  
 
 fn textureMapping(face: i32, hitPoint: vec3f) -> vec4f {
   // my box has different colors for each face
