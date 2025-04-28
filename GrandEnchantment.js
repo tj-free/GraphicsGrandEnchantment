@@ -55,6 +55,8 @@ async function init() {
   // camera._pose[3] = 0.5;
   // Create an object to trace
   // var list=["./assets/woodfloor_c.jpg","./assets/woodfloor_n.png","./assets/woodfloor_s_z.png"]
+  
+
   var list= ["./assets/T_Tile_Sandstone_02_4096_D.png","./assets/T_Tile_Sandstone_02_4096_N.png", "./assets/T_Tile_Sandstone_02_4096_S.png", "./assets/Yokohama3/negx.jpg" ,"./assets/Yokohama3/negy.jpg", "./assets/Yokohama3/negz.jpg", "./assets/Yokohama3/posx.jpg" ,"./assets/Yokohama3/posy.jpg", "./assets/Yokohama3/posz.jpg"]
   var tracerObj = new RayTracingBoxLightObject(tracer._device, tracer._canvasFormat, camera, true, list);
   await tracer.setTracerObject(tracerObj);
@@ -70,6 +72,10 @@ async function init() {
   let toggleMovement=true;
   let shadings=["Lambertian", "Phong", "Toon", "Blinn-Phong"];
   let models=["Point", "Directional", "Spot"];
+  let weatherLight=["Sunny", "Snow", "Rain"];
+  let weatherLightValues = [2, 1.5, 1];
+  var currWeather=1;
+ 
 
   
   let fps = '??';
@@ -86,8 +92,10 @@ async function init() {
                                         '[]: Change Camera Focal Y\n'+
                                         'U: Toggle Camera/Object\n'+
                                         'M: Change Light Shading: '+ shadings[tracerObj._currModel[0]]+"\n"+
-                                        'N: Change Light Model: ' + models[tracerObj._currModel[1]]);
-  var rotatespeed = 2;
+                                        'N: Change Light Model: ' + models[tracerObj._currModel[1]]+"\n"+
+                                        '1: Change Weather Light: ' + weatherLight[tracerObj._currModel[2]]
+                                      );
+  var rotatespeed = 1;
   var movespeed= 0.05;
   var focalXSpeed = 0.1;
   var focalYSpeed = 0.1;
@@ -164,6 +172,7 @@ async function init() {
       case "u": case "U":
         toggleMovement= !toggleMovement;
         break;
+
       case "m": case "M":
         tracerObj.changeModel();
         currLight=(currLight+1)%3
@@ -179,8 +188,10 @@ async function init() {
           '[]: Change Camera Focal Y\n'+
           'U: Toggle Camera/Object\n'+
           'M: Change Light Shading: '+ shadings[tracerObj._currModel[0]]+"\n"+
-          'N: Change Light Model: ' + models[tracerObj._currModel[1]]);
+          'N: Change Light Model: ' + models[tracerObj._currModel[1]] +"\n"+
+          '1: Change Weather Light: ' + weatherLight[tracerObj._currModel[2]]);
           break;
+
       case "n": case "N":
         tracerObj.changeLight();
         currModel=(currModel+1)%3
@@ -196,10 +207,102 @@ async function init() {
           '[]: Change Camera Focal Y\n'+
           'U: Toggle Camera/Object\n'+
           'M: Change Light Shading: '+ shadings[tracerObj._currModel[0]]+"\n"+
-          'N: Change Light Model: ' + models[tracerObj._currModel[1]]);
+          'N: Change Light Model: ' + models[tracerObj._currModel[1]] +"\n"+
+          '1: Change Weather Light: ' + weatherLight[tracerObj._currModel[2]]);     
+        break;
+
+      
+      //change the intensity of directional light
+      // case "1":
+      //   directionalLight._intensity[0]= directionalLight._intensity[0]-0.1
+      //   directionalLight._intensity[1]=directionalLight._intensity[1]-0.1
+      //   directionalLight._intensity[2]=directionalLight._intensity[2]-0.1
+        
+      //   tracerObj.updateLight(lightModels[currModel]);
+      //   break;
+
+
+      case "1":
+       
+        tracerObj.iterateWeatherLight(directionalLight, weatherLightValues, currWeather);
+        
+        currWeather = (currWeather + 1) %3; // cycle through values
+        tracerObj.updateLight(lightModels[currModel]);
+
+        // currModel=(currModel+1)%3
+
+        
+        infoText.updateText('WS: Move in Z\n' +
+          'AD: Move in X\n' +
+          'Space/Shift: Move in Y\n' +
+          'QE: Rotate in Z\n' +
+          'Up/Down: Rotate in X\n' +
+          'Left/Right: Rotate in Y\n' +
+          'T: Change Camera Mode\n' +
+          '-=: Change Camera Focal X\n' +
+          '[]: Change Camera Focal Y\n'+
+          'U: Toggle Camera/Object\n'+
+          'M: Change Light Shading: '+ shadings[tracerObj._currModel[0]]+"\n"+
+          'N: Change Light Model: ' + models[tracerObj._currModel[1]]  +"\n"+
+          // '1: Change Weather Light: ' + weatherLight[tracerObj._currModel[2]]);  
+          '1: Change Weather Light: ' + weatherLight[(currWeather+2) %3]);     
+
           break;
+
+
       }
   });
+
+var x = 50;
+var y = 50;
+  
+  // Testing Mouse Point Lock -------------------------
+    canvasTag.addEventListener("click", async () => {
+      if(!document.pointerLockElement) {
+        try {
+          await canvasTag.requestPointerLock({
+            unadjustedMovement: true,
+          });
+        } catch (error) {
+          if (error.name === "NotSupportedError") {
+            // Some platforms may not support unadjusted movement.
+            await canvasTag.requestPointerLock();
+          } else {
+            throw error;
+          }
+        }
+      }
+    });
+    
+    // pointer lock event listeners for mouse movement to look around
+    document.addEventListener("pointerlockchange", lockChangeAlert, false);
+    
+    function lockChangeAlert() {
+      if (document.pointerLockElement === canvasTag) {
+        console.log("The pointer lock status is now locked");
+        document.addEventListener("mousemove", updatePosition, false);
+      } else {
+        console.log("The pointer lock status is now unlocked");
+        document.removeEventListener("mousemove", updatePosition, false);
+      }
+    }
+    
+    const tracker = document.getElementById("tracker");
+
+      console.log(`X position: ${x}, Y position: ${y}`);
+
+    function updatePosition(e) {
+      const sensitivity = 0.05; // tune this based on feel
+      const deltaX = e.movementX;
+      const deltaY = e.movementY;
+      
+      // Rotate camera horizontally (Y-axis) and vertically (X-axis)
+      camera.rotateY(-deltaX * sensitivity);
+      camera.rotateX(deltaY * sensitivity);
+
+      tracerObj.updateCameraPose(); // your own method to sync visuals
+    
+    }
   
   // run animation at 60 fps
   var frameCnt = 0;
