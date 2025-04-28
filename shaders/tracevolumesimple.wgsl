@@ -450,6 +450,10 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
   // find the start and end point
   var hits = rayVolumeIntersection(p, d);
 
+  if (hits.y < 0) {
+    hits.y = hits.x;
+    hits.x = 0;
+  } 
 
   var curHit = hits.x + 0.02;
 
