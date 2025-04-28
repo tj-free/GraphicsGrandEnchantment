@@ -78,7 +78,7 @@ async function init() {
   
   let fps = '??';
   var fpsText = new StandardTextObject('VR FPS: ' + 100 + '\n' + 'FPS: ' + 100);
-  fpsText._textCanvas.style.left="1460px";
+  fpsText._textCanvas.style.left="1000px";
   const infoText = new StandardTextObject('WS: Move in Z\n' +
                                           'AD: Move in X\n' +
                                           'Space/Shift: Move in Y\n' +
@@ -185,7 +185,7 @@ async function init() {
         tracerObj.updateCameraFocal();
         break;
       case "u": case "U":
-       toggleMovement= !toggleMovement;
+        toggleMovement= !toggleMovement;
   }
   });
   

@@ -380,47 +380,91 @@ fn getNextHitValue(startT: f32, curT: f32, checkval: f32, minCorner: vec2f, maxC
   }
   return cur;
 }
+fn faceMapping(normDir: vec3f)-> i32{
+  if (all(normDir==vec3f(0,0,-1))){ // Front
+    return 0;
+  }
+  else if (all(normDir==vec3f(0,0,1))){ // Back
+    return 1;
+  }
+  else if (all(normDir==vec3f(-1,0,0))){ //Left
+    return 2;
+  }
+  else if (all(normDir==vec3f(1,0,0))){// Right
+    return 3;
+  }
+  else if (all(normDir==vec3f(0,-1,0))){// Top
+    return 4;
+  }
+  else if (all(normDir==vec3f(0,1,0))){ // Down
+    return 5;
+  }
+  else{return 4;} // Else
+}
+// a function to trace the volume - volume rendering
+fn traceScene(uv: vec2i, p: vec3f, d: vec3f) {
+  // find the start and end point
+  var hits = rayVolumeIntersection(p, d);
+  var color = vec4f(0.f/255, 0.f/255, 0.f/255, 1.); 
+  // if there is only one hit point, we trace from the camera center
+  if (hits.y < 0 && hits.x > 0) {
+    hits.y = hits.x;
+    hits.x = 0;
+  }
+  // assign colors
+  if (hits.x >= 0) { 
+    let diff = hits.y - hits.x;
+    color = vec4f(diff, 1 - diff, 0, 1.);
+  }
+  else {
+    color = vec4f(0.f/255, 56.f/255, 101.f/255, 1.); // Bucknell Blue
+  }
+  textureStore(outTexture, uv, color);  
+}  
 
-// fn boxDiffuseColor(idx: i32, hitPoint: vec3f) -> vec4f {
-//   // my box has different colors for each foace
-//   var color: vec4f;
-//     switch(idx) {
-//       case 0: { //front
-//         let textDim=vec2f(textureDimensions(dirtTexture,0));
-//         // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
-//         color=textureLoad(dirtTexture, vec2i((hitPoint.xy-vec2f(-0.5*box.scale.xy))/box.scale.xy*textDim),0);
-//         break;
-//       }
-//       case 1: { //back
-//         let textDim=vec2f(textureDimensions(dirtTexture,0));
-//         // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
-//         color=textureLoad(dirtTexture, vec2i((hitPoint.xy-vec2f(-0.5*box.scale.xy))/box.scale.xy*textDim),0);
-//         break;
-//       }
-//       case 2: { //left
-//         color = vec4f(0.f/255, 130.f/255, 186.f/255, 1.); // Bucknell Blue 2
-//         break;
-//       }
-//       case 3: { //right
-//         color = vec4f(89.f/255, 203.f/255, 232.f/255, 1.); // Bucknell Blue 3
-//         break;
-//       }
-//       case 4: { //top
-//         color = vec4f(217.f/255, 217.f/255, 214.f/255, 1.); // Bucknell gray 1
-//         break;
-//       }
-//       case 5: { //down
-//         color = vec4f(167.f/255, 168.f/255, 170.f/255, 1.); // Bucknell gray 2
-//         break;
-//       }
-//       default: {
-//         color = vec4f(0.f/255, 0.f/255, 0.f/255, 1.); // Black
-//         break;
-//       }
-//     }
-//     return color;
-// }
-
+fn textureMapping(face: i32, hitPoint: vec3f) -> vec4f {
+  // my box has different colors for each face
+  var color: vec4f;
+    switch(face) {
+      case 0: { //front
+        let textDim=vec2f(textureDimensions(grassSideTexture,0));
+        // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
+        color=textureLoad(grassSideTexture, vec2i((hitPoint.xy/(volInfo.sizes.xy))*textDim),0);
+        break;
+      }
+      case 1: { //back
+        let textDim=vec2f(textureDimensions(grassSideTexture,0));
+        // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
+        color=textureLoad(grassSideTexture, vec2i((hitPoint.xy/(volInfo.sizes.xy))*textDim),0);
+        break;
+      }
+      case 2: { //left
+        let textDim=vec2f(textureDimensions(grassSideTexture,0));
+        color = textureLoad(grassSideTexture, vec2i((hitPoint.yz/(volInfo.sizes.yz))*textDim),0);
+        break;
+      }
+      case 3: { //right
+        let textDim=vec2f(textureDimensions(grassSideTexture,0));
+        color = textureLoad(grassSideTexture, vec2i((hitPoint.yz/(volInfo.sizes.yz))*textDim),0);
+        break;
+      }
+      case 4: { //top
+        let textDim=vec2f(textureDimensions(grassTopTexture,0));
+        color = textureLoad(grassTopTexture, vec2i((hitPoint.xz/(volInfo.sizes.xz))*textDim),0);
+        break;
+      }
+      case 5: { //down
+        let textDim=vec2f(textureDimensions(dirtTexture,0));
+        color = textureLoad(dirtTexture, vec2i((hitPoint.xz-vec2f(-0.5))*textDim),0);
+        break;
+      }
+      default: {
+        color = vec4f(0.f/255, 0.f/255, 0.f/255, 1.); // Black
+        break;
+      }
+    }
+    return color;
+  }
 
 fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
   // find the start and end point
@@ -434,30 +478,28 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
   let voxelSize: vec3f = vec3f(1,1,1) * volInfo.sizes.xyz / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z); // normalized voxel size
 
 
-  var color = vec4f(0.f/255, 70.f/255, 140.f/255, 1.); // Bucknell Blue
+  var color = vec4f(0.f/255, 56.f/255, 101.f/255, 1.); // Bucknell Blue
+  var prevPos: vec3f;
+
   while (curHit < hits.y) {
     let curPt: vec3f = p + d * curHit + halfSize;
-
-    let vPos = curPt / voxelSize;
+    let vPos = curPt / (voxelSize);
     var minCorner = floor(vPos);
     var maxCorner = ceil(vPos);
-    curHit = getNextHitValue(hits.x, curHit, minCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy); // xy
-    curHit = getNextHitValue(hits.x, curHit, maxCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy);
-    curHit = getNextHitValue(hits.x, curHit, minCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz); // yz
-    curHit = getNextHitValue(hits.x, curHit, maxCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz);
-    curHit = getNextHitValue(hits.x, curHit, minCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz); // xz
-    curHit = getNextHitValue(hits.x, curHit, maxCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz);
-   
+
     if (all(vPos >= vec3f(0)) && all(vPos < volInfo.dims.xyz)) {
       let vIdx: i32 = i32(vPos.z) * i32(volInfo.dims.x * volInfo.dims.y)
                       + i32(vPos.y) * i32(volInfo.dims.x)
                       + i32(vPos.x);
       if (i32(volData[vIdx]) != 0) {
+        var currFace=faceMapping(vPos-prevPos);
         if (volData[vIdx] < volInfo.dims.y * 0.1) {
-          color = vec4f(255.f/255, 250.f/255, 250.f/255, 1.); // Snow
+          // color = vec4f(255.f/255, 250.f/255, 250.f/255, 1.); // Snow
+          color = textureMapping(currFace, curPt);
         }
         else if (volData[vIdx] < volInfo.dims.y * 0.35) {
-          color = vec4f(129.f/255, 139.f/255, 153.f/255, 1.); // Mountain
+          color = textureMapping(currFace, curPt); // Mountain
+          // color = vec4f(170.f/255, 170.f/255, 0.f/255, 1.); // Grass
         }
         else if (volData[vIdx] < volInfo.dims.y * 0.6) {
           color = vec4f(0.f/255, 170.f/255, 0.f/255, 1.); // Grass
@@ -467,6 +509,16 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
         }
         break;
       }
+    }
+    // If we don't hit anything
+    else{
+      curHit = getNextHitValue(hits.x, curHit, minCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy); // xy
+      curHit = getNextHitValue(hits.x, curHit, maxCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy);
+      curHit = getNextHitValue(hits.x, curHit, minCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz); // yz
+      curHit = getNextHitValue(hits.x, curHit, maxCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz);
+      curHit = getNextHitValue(hits.x, curHit, minCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz); // xz
+      curHit = getNextHitValue(hits.x, curHit, maxCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz);
+      prevPos = vPos;
     }
     curHit += 0.002;
   }
