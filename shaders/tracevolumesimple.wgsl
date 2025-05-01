@@ -294,6 +294,7 @@ struct CellInfo { // this is packed in 64
 @group(0) @binding(13) var stoneTexture: texture_2d<f32>;
 @group(0) @binding(14) var leafParticleTexture: texture_2d<f32>;
 @group(0) @binding(15) var particleSheet: texture_2d<f32>;
+@group(0) @binding(16) var inSampler: sampler; // a texture sampler
 
 
 
@@ -380,7 +381,47 @@ fn getNextHitValue(startT: f32, curT: f32, checkval: f32, minCorner: vec2f, maxC
   }
   return cur;
 }
-fn faceMapping(normDir: vec3f)-> i32{
+fn faceMapping(viewDir: vec3f)-> i32{
+  // idea: use dot product to find which face normal is the most parallel to the current (negative) ray direction [callled it viewDir]
+  var mostParallelFace = -1; // Unknown face
+  var maxDotValue = -1f;
+
+  var dotValue = dot(viewDir, vec3f(0, 0, -1)); // Front
+  if (dotValue > maxDotValue) {
+    maxDotValue = dotValue;
+    mostParallelFace = 0;
+  }
+
+  dotValue = dot(viewDir, vec3f(0, 0, 1)); // Back
+  if (dotValue > maxDotValue) {
+    maxDotValue = dotValue;
+    mostParallelFace = 1;
+  }
+
+  dotValue = dot(viewDir, vec3f(-1,0,0)); // Left
+  if (dotValue > maxDotValue) {
+    maxDotValue = dotValue;
+    mostParallelFace = 2;
+  }
+
+  dotValue = dot(viewDir, vec3f(1,0,0)); // Right
+  if (dotValue > maxDotValue) {
+    maxDotValue = dotValue;
+    mostParallelFace = 3;
+  }
+
+  dotValue = dot(viewDir, vec3f(0,-1,0)); // Top
+  if (dotValue > maxDotValue) {
+    maxDotValue = dotValue;
+    mostParallelFace = 4;
+  }
+  dotValue = dot(viewDir, vec3f(0,1,0)); // Down
+  if (dotValue > maxDotValue) {
+    maxDotValue = dotValue;
+    mostParallelFace = 5;
+  }
+  return mostParallelFace;
+/*
   if (all(normDir==vec3f(0,0,-1))){ // Front
     return 0;
   }
@@ -400,42 +441,44 @@ fn faceMapping(normDir: vec3f)-> i32{
     return 5;
   }
   else{return 4;} // Else
+  */
 } 
 
 fn textureMapping(face: i32, hitPoint: vec3f) -> vec4f {
   // my box has different colors for each face
+  //NOTE TO SELF: REMOVE TEXTDIM, WE DON'T NEED IT
   var color: vec4f;
     switch(face) {
       case 0: { //front
         let textDim=vec2f(textureDimensions(grassSideTexture,0));
         // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
-        color=textureLoad(grassSideTexture, vec2i((hitPoint.xy/(volInfo.sizes.xy))*textDim),0);
+        color=textureSampleLevel(grassSideTexture, inSampler, hitPoint.xy,0);
         break;
       }
       case 1: { //back
         let textDim=vec2f(textureDimensions(grassSideTexture,0));
         // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
-        color=textureLoad(grassSideTexture, vec2i((hitPoint.xy/(volInfo.sizes.xy))*textDim),0);
+        color=textureSampleLevel(grassSideTexture, inSampler, hitPoint.xy, 0);
         break;
       }
       case 2: { //left
         let textDim=vec2f(textureDimensions(grassSideTexture,0));
-        color = textureLoad(grassSideTexture, vec2i((hitPoint.yz/(volInfo.sizes.yz))*textDim),0);
+        color = textureSampleLevel(grassSideTexture, inSampler, hitPoint.yz,0);
         break;
       }
       case 3: { //right
         let textDim=vec2f(textureDimensions(grassSideTexture,0));
-        color = textureLoad(grassSideTexture, vec2i((hitPoint.yz/(volInfo.sizes.yz))*textDim),0);
+        color = textureSampleLevel(grassSideTexture, inSampler, hitPoint.yz,0);
         break;
       }
       case 4: { //top
         let textDim=vec2f(textureDimensions(grassTopTexture,0));
-        color = textureLoad(grassTopTexture, vec2i((hitPoint.xz/(volInfo.sizes.xz))*textDim),0);
+        color = textureSampleLevel(grassTopTexture, inSampler, hitPoint.xz,0);
         break;
       }
       case 5: { //down
         let textDim=vec2f(textureDimensions(dirtTexture,0));
-        color = textureLoad(dirtTexture, vec2i((hitPoint.xz-vec2f(-0.5))*textDim),0);
+        color = textureSampleLevel(dirtTexture, inSampler, hitPoint.xz,0);
         break;
       }
       default: {
@@ -450,13 +493,10 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
   // find the start and end point
   var hits = rayVolumeIntersection(p, d);
 
-
   var curHit = hits.x + 0.02;
-
 
   let halfSize: vec3f = volInfo.dims.xyz * volInfo.sizes.xyz * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z);
   let voxelSize: vec3f = vec3f(1,1,1) * volInfo.sizes.xyz / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z); // normalized voxel size
-
 
   var color = vec4f(0.f/255, 70.f/255, 140.f/255, 1.); // Bucknell Blue
   var prevPos: vec3f;
@@ -471,21 +511,24 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
       let vIdx: i32 = i32(vPos.z) * i32(volInfo.dims.x * volInfo.dims.y)
                       + i32(vPos.y) * i32(volInfo.dims.x)
                       + i32(vPos.x);
+
       if (i32(volData[vIdx]) != 0) {
-        var currFace=faceMapping(vPos-prevPos);
+        var currFace=faceMapping(-d);
         if (volData[vIdx] < volInfo.dims.y * 0.1) {
           // color = vec4f(255.f/255, 250.f/255, 250.f/255, 1.); // Snow
-          color = textureMapping(currFace, curPt);
+          color = textureMapping(currFace, (vPos - minCorner) / (maxCorner - minCorner));
         }
         else if (volData[vIdx] < volInfo.dims.y * 0.35) {
-          color = textureMapping(currFace, curPt); // Mountain
+          color = textureMapping(currFace, (vPos - minCorner) / (maxCorner - minCorner)); // Mountain
           // color = vec4f(170.f/255, 170.f/255, 0.f/255, 1.); // Grass
         }
         else if (volData[vIdx] < volInfo.dims.y * 0.6) {
-          color = vec4f(0.f/255, 170.f/255, 0.f/255, 1.); // Grass
+          color = textureMapping(currFace, (vPos - minCorner) / (maxCorner - minCorner)); 
+          //color = vec4f(0.f/255, 170.f/255, 0.f/255, 1.); // Grass
         }
         else {
-          color = vec4f(96.f/255, 177.f/255, 199.f/255, 1.); // Water
+          color = textureMapping(currFace, (vPos - minCorner) / (maxCorner - minCorner)); 
+          //color = vec4f(96.f/255, 177.f/255, 199.f/255, 1.); // Water
         }
         break;
       }
