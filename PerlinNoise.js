@@ -61,18 +61,19 @@ async function init() {
 
   await tracer.setTracerObject(tracerObj);
  
-  leftCamera.moveZ(-2);
-  leftCamera.moveY(0.5);
+  // leftCamera.moveZ(-2);
+  leftCamera.moveY(-2);
+  // leftCamera.moveZ(-5);
   // NOTE: cameras need to be rotated?
   // How do humans see
   // leftCamera.moveX(0.0298200368);
-  leftCamera.moveX(-0.008);
-  leftCamera.rotateY(5);
-  rightCamera.moveZ(-2);
-  rightCamera.moveY(0.5);
+  leftCamera.moveX(-0.000);
+  // leftCamera.rotateY(5);
+  // rightCamera.moveZ(-2);
+  rightCamera.moveY(-2);
   // rightCamera.moveX(-0.0298200368);
   rightCamera.moveX(0.008);
-  rightCamera.rotateY(-5);
+  // rightCamera.rotateY(-5);
   
   let toggleMovement=true;
   
