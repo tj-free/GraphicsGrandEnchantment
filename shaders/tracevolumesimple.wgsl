@@ -275,25 +275,26 @@ struct CellInfo { // this is packed in 64
 }
 
 // binding the camera pose
-@group(0) @binding(0) var<uniform> cameraPose: array<Camera, 2>;
+@group(0) @binding(0) var<storage> cameraPoseIn: array<Camera, 2>;
+@group(0) @binding(1) var<storage, read_write> cameraPoseOut: array<Camera, 2>;
 // binding the volume info
-@group(0) @binding(1) var<uniform> volInfo: VolInfo;
+@group(0) @binding(2) var<uniform> volInfo: VolInfo;
 // binding the volume data
-@group(0) @binding(2) var<storage> volData: array<f32>; // array<CellInfo>
+@group(0) @binding(3) var<storage> volData: array<f32>; // array<CellInfo>
 // binding the output texture to store the ray tracing results
-@group(0) @binding(3) var outTextureLeft: texture_storage_2d<rgba8unorm, write>;
-@group(0) @binding(4) var outTextureRight: texture_storage_2d<rgba8unorm, write>;
-@group(0) @binding(5) var leavesTexture: texture_2d<f32>;
-@group(0) @binding(6) var dirtTexture: texture_2d<f32>;
-@group(0) @binding(7) var grassTopTexture: texture_2d<f32>;
-@group(0) @binding(8) var grassSideTexture: texture_2d<f32>;
-@group(0) @binding(9) var snowySideTexture: texture_2d<f32>;
-@group(0) @binding(10) var logTexture: texture_2d<f32>;
-@group(0) @binding(11) var logSideTexture: texture_2d<f32>;
-@group(0) @binding(12) var snowyTopTexture: texture_2d<f32>;
-@group(0) @binding(13) var stoneTexture: texture_2d<f32>;
-@group(0) @binding(14) var leafParticleTexture: texture_2d<f32>;
-@group(0) @binding(15) var particleSheet: texture_2d<f32>;
+@group(0) @binding(4) var outTextureLeft: texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(5) var outTextureRight: texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(6) var leavesTexture: texture_2d<f32>;
+@group(0) @binding(7) var dirtTexture: texture_2d<f32>;
+@group(0) @binding(8) var grassTopTexture: texture_2d<f32>;
+@group(0) @binding(9) var grassSideTexture: texture_2d<f32>;
+@group(0) @binding(10) var snowySideTexture: texture_2d<f32>;
+@group(0) @binding(11) var logTexture: texture_2d<f32>;
+@group(0) @binding(12) var logSideTexture: texture_2d<f32>;
+@group(0) @binding(13) var snowyTopTexture: texture_2d<f32>;
+@group(0) @binding(14) var stoneTexture: texture_2d<f32>;
+@group(0) @binding(15) var leafParticleTexture: texture_2d<f32>;
+@group(0) @binding(16) var particleSheet: texture_2d<f32>;
 
 
 
@@ -302,14 +303,14 @@ struct CellInfo { // this is packed in 64
 // a function to transform the direction to the model coordiantes
 fn transformDir(d: vec3f, cameraId: u32) -> vec3f {
   // transform the direction using the camera pose
-  var out = applyMotorToDir(d, cameraPose[cameraId].motor);
+  var out = applyMotorToDir(d, cameraPoseIn[cameraId].motor);
   return out;
 }
 
 // a function to transform the start pt to the model coordiantes
 fn transformPt(pt: vec3f, cameraId: u32) -> vec3f {
   // transform the point using the camera pose
-  var out = applyMotorToPoint(pt, cameraPose[cameraId].motor);
+  var out = applyMotorToPoint(pt, cameraPoseIn[cameraId].motor);
   return out;
 }
 
@@ -531,10 +532,10 @@ fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u, @built
   }
   if (uv.x < texDim.x && uv.y < texDim.y) {
     // compute the pixel size
-    let psize = vec2f(2, 2) / cameraPose[cameraId].res.xy * cameraPose[cameraId].focal.xy;
+    let psize = vec2f(2, 2) / cameraPoseIn[0].res.xy * cameraPoseIn[0].focal.xy;
     // orthogonal camera ray sent from each pixel center at z = 0
     var spt = vec3f(0, 0, 0);
-    var rdir = vec3f((f32(uv.x) + 0.5) * psize.x - cameraPose[cameraId].focal.x, (f32(uv.y) + 0.5) * psize.y - cameraPose[cameraId].focal.y, 1);
+    var rdir = vec3f((f32(uv.x) + 0.5) * psize.x - cameraPoseIn[0].focal.x, (f32(uv.y) + 0.5) * psize.y - cameraPoseIn[0].focal.y, 1);
     // apply transformation
     spt = transformPt(spt, cameraId);
     rdir = transformDir(rdir, cameraId);
