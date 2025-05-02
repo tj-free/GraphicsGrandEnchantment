@@ -541,5 +541,12 @@ fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u, @built
     rdir = transformDir(rdir, cameraId);
 
     traceTerrain(uv, spt, rdir, cameraId);
+
+    cameraPoseOut[cameraId] = cameraPoseIn[cameraId];
+    if (!raytrace(spt, vec3f(0, 1, 0), 0.01)) {
+      let dt = createTranslator(vec3f(0, 0.01, 0));
+      let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
+      cameraPoseOut[cameraId].motor = newpose;
+    }
   }
 }
