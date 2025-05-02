@@ -315,15 +315,17 @@ fn transformPt(pt: vec3f, cameraId: u32) -> vec3f {
 }
 
 // a helper function to keep track of the two ray-volume hit values
-fn compareVolumeHitValues(curValue: vec2f, t: f32) -> vec2f {
+fn compareVolumeHitValues(curValue: vec3f, t: f32, faceIdx: i32) -> vec3f {
   var result = curValue;
   if (curValue.x < 0) { // no hit value yet
     result.x = t; // update the closest
+    result.z = f32(faceIdx); // keep track of which face it htis
   }
   else {
     if (t < curValue.x) { // if find a closer hit value
       result.y = curValue.x; // update the second closest
       result.x = t;          // update the closest
+      result.z = f32(faceIdx); // update the face index
     }
     else {
       if (curValue.y < 0) { // no second hit value yet
@@ -338,14 +340,14 @@ fn compareVolumeHitValues(curValue: vec2f, t: f32) -> vec2f {
 }
 
 // a helper function to compute the ray-volume hit values
-fn getVolumeHitValues(checkval: f32, halfsize: vec2f, pval: f32, dval: f32, p: vec2f, d: vec2f, curT: vec2f) -> vec2f {
+fn getVolumeHitValues(checkval: f32, halfsize: vec2f, pval: f32, dval: f32, p: vec2f, d: vec2f, curT: vec3f, faceIdx: i32) -> vec3f {
   var cur = curT;
   if (abs(dval) > EPSILON) {
     let t = (checkval - pval) / dval; // compute the current hit point to the check value
     if (t > 0) {
       let hPt = p + t * d;
       if (-halfsize.x < hPt.x && hPt.x < halfsize.x && -halfsize.y < hPt.y && hPt.y < halfsize.y) {
-        cur = compareVolumeHitValues(cur, t);
+        cur = compareVolumeHitValues(cur, t, faceIdx);
       }
     }
   }
@@ -353,29 +355,28 @@ fn getVolumeHitValues(checkval: f32, halfsize: vec2f, pval: f32, dval: f32, p: v
 }
 
 // a function to compute the start and end t values of the ray hitting the volume
-fn rayVolumeIntersection(p: vec3f, d: vec3f) -> vec2f {
-  var hitValues = vec2f(-1, -1);
+fn rayVolumeIntersection(p: vec3f, d: vec3f) -> vec3f {
+  var hitValues = vec3f(-1, -1, -1);
   let halfsize = volInfo.dims * volInfo.sizes * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z); // 1mm
-  //let halfsize = vec3f(0.5, 0.5, 0.5) * volInfo.sizes.xyz;
-  // hitPt = p + t * d => t = (hitPt - p) / d
-  hitValues = getVolumeHitValues(halfsize.z, halfsize.xy, p.z, d.z, p.xy, d.xy, hitValues); // z = halfsize.z
-  hitValues = getVolumeHitValues(-halfsize.z, halfsize.xy, p.z, d.z, p.xy, d.xy, hitValues); // z = -halfsize.z
-  hitValues = getVolumeHitValues(-halfsize.x, halfsize.yz, p.x, d.x, p.yz, d.yz, hitValues); // x = -halfsize.x
-  hitValues = getVolumeHitValues(halfsize.x, halfsize.yz, p.x, d.x, p.yz, d.yz, hitValues); // x = halfsize.x
-  hitValues = getVolumeHitValues(halfsize.y, halfsize.xz, p.y, d.y, p.xz, d.xz, hitValues); // y = halfsize.y
-  hitValues = getVolumeHitValues(-halfsize.y, halfsize.xz, p.y, d.y, p.xz, d.xz, hitValues); // y = -halfsize.y
+  hitValues = getVolumeHitValues(halfsize.z, halfsize.xy, p.z, d.z, p.xy, d.xy, hitValues, 1); // z = halfsize.z Back
+  hitValues = getVolumeHitValues(-halfsize.z, halfsize.xy, p.z, d.z, p.xy, d.xy, hitValues, 0); // z = -halfsize.z Front
+  hitValues = getVolumeHitValues(-halfsize.x, halfsize.yz, p.x, d.x, p.yz, d.yz, hitValues, 2); // x = -halfsize.x Left
+  hitValues = getVolumeHitValues(halfsize.x, halfsize.yz, p.x, d.x, p.yz, d.yz, hitValues, 3); // x = halfsize.x Right
+  hitValues = getVolumeHitValues(halfsize.y, halfsize.xz, p.y, d.y, p.xz, d.xz, hitValues, 5); // y = halfsize.y Bottom
+  hitValues = getVolumeHitValues(-halfsize.y, halfsize.xz, p.y, d.y, p.xz, d.xz, hitValues, 4); // y = -halfsize.y Top 
   return hitValues;
 }
 
 // a helper function to get the next hit value
-fn getNextHitValue(startT: f32, curT: f32, checkval: f32, minCorner: vec2f, maxCorner: vec2f, pval: f32, dval: f32, p: vec2f, d: vec2f) -> f32 {
+fn getNextHitValue(startT: f32, curT: vec2f, checkval: f32, minCorner: vec2f, maxCorner: vec2f, pval: f32, dval: f32, p: vec2f, d: vec2f, faceIdx: i32) -> vec2f {
   var cur = curT;
   if (abs(dval) > EPSILON) {
     let t = (checkval - pval) / dval; // compute the current hit point to the check value
     let hPt = p + t * d;
     if (minCorner.x < hPt.x && hPt.x < maxCorner.x && minCorner.y < hPt.y && hPt.y < maxCorner.y) {
-      if (t > startT && cur < t) {
-        cur = t;
+      if (t > startT && cur.x < t) {
+        cur.x = t;
+        cur.y = f32(faceIdx);
       }
     }
   }
@@ -486,6 +487,7 @@ fn textureMapping(face: i32, hitPoint: vec3f) -> vec4f {
         break;
       }
     }
+    //color = vec4f(1, 0, 0, 1);  
     return color;
   }
 
@@ -493,7 +495,7 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
   // find the start and end point
   var hits = rayVolumeIntersection(p, d);
 
-  var curHit = hits.x + 0.02;
+  var curHit = vec2f(hits.x + 0.02, hits.z);
 
   let halfSize: vec3f = volInfo.dims.xyz * volInfo.sizes.xyz * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z);
   let voxelSize: vec3f = vec3f(1,1,1) * volInfo.sizes.xyz / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z); // normalized voxel size
@@ -501,8 +503,8 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
   var color = vec4f(0.f/255, 70.f/255, 140.f/255, 1.); // Bucknell Blue
   var prevPos: vec3f;
 
-  while (curHit < hits.y) {
-    let curPt: vec3f = p + d * curHit + halfSize;
+  while (curHit.x < hits.y) {
+    let curPt: vec3f = p + d * curHit.x + halfSize;
     let vPos = curPt / (voxelSize);
     var minCorner = floor(vPos);
     var maxCorner = ceil(vPos);
@@ -513,7 +515,7 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
                       + i32(vPos.x);
 
       if (i32(volData[vIdx]) != 0) {
-        var currFace=faceMapping(-d);
+        var currFace=i32(curHit.y);//faceMapping(-d);
         if (volData[vIdx] < volInfo.dims.y * 0.1) {
           // color = vec4f(255.f/255, 250.f/255, 250.f/255, 1.); // Snow
           color = textureMapping(currFace, (vPos - minCorner) / (maxCorner - minCorner));
@@ -535,15 +537,15 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
     }
     // If we don't hit anything
     else{
-      curHit = getNextHitValue(hits.x, curHit, minCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy); // xy
-      curHit = getNextHitValue(hits.x, curHit, maxCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy);
-      curHit = getNextHitValue(hits.x, curHit, minCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz); // yz
-      curHit = getNextHitValue(hits.x, curHit, maxCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz);
-      curHit = getNextHitValue(hits.x, curHit, minCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz); // xz
-      curHit = getNextHitValue(hits.x, curHit, maxCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz);
+      curHit = getNextHitValue(hits.x, curHit, minCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy, 1); // xy
+      curHit = getNextHitValue(hits.x, curHit, maxCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy, 0);
+      curHit = getNextHitValue(hits.x, curHit, minCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz, 2); // yz
+      curHit = getNextHitValue(hits.x, curHit, maxCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz, 3);
+      curHit = getNextHitValue(hits.x, curHit, minCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz, 5); // xz
+      curHit = getNextHitValue(hits.x, curHit, maxCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz, 4);
       prevPos = vPos;
     }
-    curHit += 0.002;
+    curHit.x += 0.002;
   }
   // textureStore(outTextureRight, uv, color);
   // TODO: Fix the right texture not texturing
