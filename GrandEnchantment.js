@@ -34,6 +34,9 @@ import Camera from './lib/Viz/3DCamera.js'
 import PointLight from './lib/Viz/PointLight.js'
 import DirectionalLight from './lib/Viz/DirectionalLight.js'
 import SpotlightLight from './lib/Viz/SpotLight.js'
+import MassParticleSystem from './lib/DSViz/MassParticleSystem.js'
+import Renderer from './lib/Viz/2DRenderer.js'
+import ParticleSystemObject from './lib/DSViz/ParticleSystemObject.js'
 
 async function init() {
   // Create a canvas tag
@@ -59,7 +62,10 @@ async function init() {
 
   var list= ["./assets/T_Tile_Sandstone_02_4096_D.png","./assets/T_Tile_Sandstone_02_4096_N.png", "./assets/T_Tile_Sandstone_02_4096_S.png", "./assets/Yokohama3/negx.jpg" ,"./assets/Yokohama3/negy.jpg", "./assets/Yokohama3/negz.jpg", "./assets/Yokohama3/posx.jpg" ,"./assets/Yokohama3/posy.jpg", "./assets/Yokohama3/posz.jpg"]
   var tracerObj = new RayTracingBoxLightObject(tracer._device, tracer._canvasFormat, camera, true, list);
+  var particleObject = new MassParticleSystem(tracer._device, tracer._canvasFormat,canvasTag,camera);
+
   await tracer.setTracerObject(tracerObj);
+  await tracer.setParticleObject(particleObject);
   // Create a light object and set it to our box light object
   // if you want to change light, you just need to change this object and upload it to the GPU by calling traceObje.updateLight(light)
   var pointLight = new PointLight();

@@ -33,6 +33,9 @@ import StandardTextObject from './lib/DSViz/StandardTextObject.js'
 import VolumeRenderingSimpleObject from './lib/DSViz/VolumeRenderingSimpleObject.js'
 import Camera from './lib/Viz/3DCamera.js'
 import VRInput from './lib/Input/VRInput.js';
+import MassParticleSystem from './lib/DSViz/MassParticleSystem.js'
+import Renderer from './lib/Viz/2DRenderer.js'
+import ParticleSystemObject from './lib/DSViz/ParticleSystemObject.js'
 
 async function init() {
   // Create a canvas tag
@@ -56,10 +59,13 @@ async function init() {
 
   var tracerObj= new VolumeRenderingSimpleObject(tracer._device, tracer._canvasFormat,
   [leftCamera, rightCamera], true, blockTextures.concat(particleTextures));
+
   
   var vrInput = new VRInput();
 
   await tracer.setTracerObject(tracerObj);
+
+  
  
   leftCamera.moveZ(-2);
   leftCamera.moveY(0.5);
