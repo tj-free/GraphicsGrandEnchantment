@@ -164,9 +164,6 @@ async function init() {
         rightCamera.rotateY(-rotatespeed);
         tracerObj.updateCameraPose();
         break;
-      case 't': case 'T':
-        camera.toggleProjective();
-        break;
       case '-':
         leftCamera.changeFocalX(focalXSpeed);
         rightCamera.changeFocalX(focalXSpeed);
