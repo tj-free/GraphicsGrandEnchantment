@@ -274,6 +274,23 @@ struct CellInfo { // this is packed in 64
   particleIndices: array<f32, 63>, // the particles in this cell
 }
 
+// struct to store the light
+struct Light {
+  intensity: vec4f,   // the light intensity
+  position: vec4f,    // where the light is
+  direction: vec4f,   // the light direction
+  attenuation: vec4f, // the attenuation factors
+  params: vec4f,      // other parameters such as cut-off, drop off, area width/height, and radius etc.
+  model: vec4u,
+}
+
+// a structure to store the computed light information
+struct LightInfo {
+  intensity: vec4f, // the final light intensity
+  lightdir: vec3f, // the final light direction
+  dist: f32, // the final light dist
+}
+
 // binding the camera pose
 @group(0) @binding(0) var<uniform> cameraPose: array<Camera, 2>;
 // binding the volume info
@@ -294,6 +311,9 @@ struct CellInfo { // this is packed in 64
 @group(0) @binding(13) var stoneTexture: texture_2d<f32>;
 @group(0) @binding(14) var leafParticleTexture: texture_2d<f32>;
 @group(0) @binding(15) var particleSheet: texture_2d<f32>;
+//binding the light
+@group(0) @binding(16) var<uniform> light: Light;
+
 
 
 
@@ -380,47 +400,136 @@ fn getNextHitValue(startT: f32, curT: f32, checkval: f32, minCorner: vec2f, maxC
   }
   return cur;
 }
+fn faceMapping(normDir: vec3f)-> i32{
+  if (all(normDir==vec3f(0,0,-1))){ // Front
+    return 0;
+  }
+  else if (all(normDir==vec3f(0,0,1))){ // Back
+    return 1;
+  }
+  else if (all(normDir==vec3f(-1,0,0))){ //Left
+    return 2;
+  }
+  else if (all(normDir==vec3f(1,0,0))){// Right
+    return 3;
+  }
+  else if (all(normDir==vec3f(0,-1,0))){// Top
+    return 4;
+  }
+  else if (all(normDir==vec3f(0,1,0))){ // Down
+    return 5;
+  }
+  else{return 0;} // Else
+}
+// a function to trace the volume - volume rendering
+// fn traceScene(uv: vec2i, p: vec3f, d: vec3f) {
+//   // find the start and end point
+//   var hits = rayVolumeIntersection(p, d);
+//   var color = vec4f(0.f/255, 0.f/255, 0.f/255, 1.); 
+//   // if there is only one hit point, we trace from the camera center
+//   if (hits.y < 0 && hits.x > 0) {
+//     hits.y = hits.x;
+//     hits.x = 0;
+//   }
+//   // assign colors
+//   if (hits.x >= 0) { 
+//     let diff = hits.y - hits.x;
+//     color = vec4f(diff, 1 - diff, 0, 1.);
+//   }
+//   else {
+//     color = vec4f(0.f/255, 56.f/255, 101.f/255, 1.); // Bucknell Blue
+//   }
+//   textureStore(outTexture, uv, color);  
+// }  
 
-// fn boxDiffuseColor(idx: i32, hitPoint: vec3f) -> vec4f {
-//   // my box has different colors for each foace
-//   var color: vec4f;
-//     switch(idx) {
-//       case 0: { //front
-//         let textDim=vec2f(textureDimensions(dirtTexture,0));
-//         // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
-//         color=textureLoad(dirtTexture, vec2i((hitPoint.xy-vec2f(-0.5*box.scale.xy))/box.scale.xy*textDim),0);
-//         break;
-//       }
-//       case 1: { //back
-//         let textDim=vec2f(textureDimensions(dirtTexture,0));
-//         // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
-//         color=textureLoad(dirtTexture, vec2i((hitPoint.xy-vec2f(-0.5*box.scale.xy))/box.scale.xy*textDim),0);
-//         break;
-//       }
-//       case 2: { //left
-//         color = vec4f(0.f/255, 130.f/255, 186.f/255, 1.); // Bucknell Blue 2
-//         break;
-//       }
-//       case 3: { //right
-//         color = vec4f(89.f/255, 203.f/255, 232.f/255, 1.); // Bucknell Blue 3
-//         break;
-//       }
-//       case 4: { //top
-//         color = vec4f(217.f/255, 217.f/255, 214.f/255, 1.); // Bucknell gray 1
-//         break;
-//       }
-//       case 5: { //down
-//         color = vec4f(167.f/255, 168.f/255, 170.f/255, 1.); // Bucknell gray 2
-//         break;
-//       }
-//       default: {
-//         color = vec4f(0.f/255, 0.f/255, 0.f/255, 1.); // Black
-//         break;
-//       }
-//     }
-//     return color;
-// }
+fn textureMapping(face: i32, hitPoint: vec3f) -> vec4f {
+  // my box has different colors for each foace
+  var color: vec4f;
+    switch(face) {
+      case 0: { //front
+        let textDim=vec2f(textureDimensions(grassSideTexture,0));
+        // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
+        color=textureLoad(grassSideTexture, vec2i((hitPoint.xy/(volInfo.sizes.xy))*textDim),0);
+        break;
+      }
+      case 1: { //back
+        let textDim=vec2f(textureDimensions(grassSideTexture,0));
+        // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
+        color=textureLoad(grassSideTexture, vec2i((hitPoint.xy-vec2f(-0.5))*textDim),0);
+        break;
+      }
+      case 2: { //left
+        let textDim=vec2f(textureDimensions(grassSideTexture,0));
+        color = textureLoad(grassSideTexture, vec2i((hitPoint.yz-vec2f(-0.5))*textDim),0);
+        break;
+      }
+      case 3: { //right
+        let textDim=vec2f(textureDimensions(grassSideTexture,0));
+        color = textureLoad(grassSideTexture, vec2i((hitPoint.yz-vec2f(-0.5))*textDim),0);
+        break;
+      }
+      case 4: { //top
+        let textDim=vec2f(textureDimensions(grassTopTexture,0));
+        color = textureLoad(grassTopTexture, vec2i((hitPoint.xz-vec2f(-0.5))*textDim),0);
+        break;
+      }
+      case 5: { //down
+        let textDim=vec2f(textureDimensions(dirtTexture,0));
+        color = textureLoad(dirtTexture, vec2i((hitPoint.xz-vec2f(-0.5))*textDim),0);
+        break;
+      }
+      default: {
+        color = vec4f(0.f/255, 0.f/255, 0.f/255, 1.); // Black
+        break;
+      }
+    }
+    return color;
+  }
 
+// a function to get the box emit color
+fn boxEmitColor() -> vec4f {
+  return vec4f(0, 0, 0, 1); // my box doesn't emit any color
+}
+
+// a function to compute the light intensity and direction
+fn getLightInfo(lightPos: vec3f, lightDir: vec3f, hitPoint: vec3f, objectNormal: vec3f) -> LightInfo {
+  // Note: here I implemented point light - you should modify this function for different light sources
+
+  //directional light
+  
+    // first, get the source intensity
+    var intensity = light.intensity; 
+    // compute the view direction
+    var viewDirection = normalize(lightDir);
+    // set the final light info
+    var out: LightInfo;
+    // the final light intensity depends on the view direction
+    out.intensity = intensity * max(dot(viewDirection, -objectNormal), 0);
+    // the final light diretion is the current view direction
+    out.lightdir = viewDirection;
+    out.dist= dot(hitPoint - lightPos,hitPoint - lightPos); 
+
+    return out;
+ 
+}
+
+
+// a function to transform hit point to the world coordiantes
+fn transformHitPoint(pt: vec3f) -> vec3f {
+  var out = pt * volInfo.sizes.xyz;
+  //TODO: transform the hit point into the world space - using the voxel motor - MAKE - just transfored
+  // out = applyMotorToPoint(out, currBox.motor);
+  return out;
+}
+
+// a function to transform normal to the world coordiantes
+fn transformNormal(n: vec3f) -> vec3f {
+  var out = n * volInfo.sizes.xyz;
+  //TODO: transform the normal into the world space - using the voxel motor - MAKE - just transfored
+
+  // out = applyMotorToDir(out, currBox.motor);
+  return normalize(out);
+}
 
 fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
   // find the start and end point
@@ -434,30 +543,28 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
   let voxelSize: vec3f = vec3f(1,1,1) * volInfo.sizes.xyz / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z); // normalized voxel size
 
 
-  var color = vec4f(0.f/255, 70.f/255, 140.f/255, 1.); // Bucknell Blue
-  while (curHit < hits.y) {
-    let curPt: vec3f = p + d * curHit + halfSize;
+  var color = vec4f(0.f/255, 56.f/255, 101.f/255, 1.); // Bucknell Blue
+  var prevPos: vec3f;
 
+  while (curHit < hits.y) {
+    var curPt: vec3f = p + d * curHit + halfSize;
     let vPos = curPt / voxelSize;
     var minCorner = floor(vPos);
     var maxCorner = ceil(vPos);
-    curHit = getNextHitValue(hits.x, curHit, minCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy); // xy
-    curHit = getNextHitValue(hits.x, curHit, maxCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy);
-    curHit = getNextHitValue(hits.x, curHit, minCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz); // yz
-    curHit = getNextHitValue(hits.x, curHit, maxCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz);
-    curHit = getNextHitValue(hits.x, curHit, minCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz); // xz
-    curHit = getNextHitValue(hits.x, curHit, maxCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz);
-   
+    // var currentHit=curHit;
+
     if (all(vPos >= vec3f(0)) && all(vPos < volInfo.dims.xyz)) {
       let vIdx: i32 = i32(vPos.z) * i32(volInfo.dims.x * volInfo.dims.y)
                       + i32(vPos.y) * i32(volInfo.dims.x)
                       + i32(vPos.x);
       if (i32(volData[vIdx]) != 0) {
+        var currFace=faceMapping(-vPos+prevPos);
         if (volData[vIdx] < volInfo.dims.y * 0.1) {
           color = vec4f(255.f/255, 250.f/255, 250.f/255, 1.); // Snow
         }
         else if (volData[vIdx] < volInfo.dims.y * 0.35) {
-          color = vec4f(129.f/255, 139.f/255, 153.f/255, 1.); // Mountain
+          color = textureMapping(currFace, curPt); // Mountain
+          // color = vec4f(170.f/255, 170.f/255, 0.f/255, 1.); // Grass
         }
         else if (volData[vIdx] < volInfo.dims.y * 0.6) {
           color = vec4f(0.f/255, 170.f/255, 0.f/255, 1.); // Grass
@@ -465,8 +572,93 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
         else {
           color = vec4f(96.f/255, 177.f/255, 199.f/255, 1.); // Water
         }
-        break;
+
+
+
+
+
+      //ADDED CODE FROM TRACEBOX LIGHT HERE
+      // here, I provide you with the Lambertian shading implementation
+      // You need to modify it for other shading model
+      // first, get the emit color
+      let emit = boxEmitColor(); 
+      // then, compute the diffuse color, which depends on the light source
+      //   1. get the box diffuse color - i.e. the material property of diffusion on the box
+      // var hitPt = spt + rdir * hitInfo.x;
+      curPt = transformHitPoint(curPt);
+      var diffuse = color; // get the box diffuse property
+      //   2. get the box normal
+      var normal = normalize(-vPos+prevPos);
+      //   3. transform the normal to the world coordinates
+      //   Note: here it is using the box pose/motor and scale. 
+      //         you will need to modify this transformation for different objects
+      normal = transformNormal(normal);
+      //   4. transform the light to the world coordinates
+      //   Note: My light is stationary, so Icancel the camera movement to keep it stationary
+      // let lightPos = applyMotorToPoint(light.position.xyz, reverse(cameraPose.motor));
+      // let lightDir = applyMotorToDir(light.direction.xyz, reverse(cameraPose.motor));
+      let lightPos = light.position.xyz;
+      let lightDir= light.direction.xyz;
+      //   5. transform the hit point to the world coordiantes
+      //   Note: the hit point is in the model coordiantes, need to transform back to the world
+      //   6. compute the light information
+      //   Note: I do the light computation in the world coordiantes because the light intensity depends on the distance and angles in the world coordiantes! If you do it in other coordinate system, make sure you transform them properly back to the world one.
+      var lightInfo = getLightInfo(lightPos, lightDir, curPt, normal);
+     
+      //   7. finally, modulate the diffuse color by the light
+      // lightInfo.intensity = toon(lightInfo.intensity, 5);
+      diffuse *= saturate(lightInfo.intensity);
+      // last, compute the final color. Here Lambertian = emit + diffuse
+      color = diffuse;
+
+      // if (light.model[0]==0){
+      //   // LAMBERTIAN MODEL
+      //   color = emit + diffuse;
+      // }
+      // else if (light.model[0]==1){
+      //   // PHONG MODEL
+      //   let R=reflect(lightInfo.lightdir, normal);
+      //   var specular= vec4f(1, 1, 1, 1)* lightInfo.intensity * pow(dot(rdir, -R),100);
+      //   specular = clamp(specular, vec4f(0, 0, 0, 0) , vec4f(1, 1, 1, 1));
+      //   let ambient= vec4f(0.1, 0.1, 0.1, 1)*lightInfo.intensity;
+      //   color = emit + diffuse + specular + ambient;
+      // }
+      // else if (light.model[0]==2){ 
+      //   // TOON MODEL
+      //   let R=reflect(lightInfo.lightdir, normal);
+      //   var specular= vec4f(1, 1, 1, 1)* lightInfo.intensity * pow(dot(rdir, -R),100);
+      //   specular = clamp(specular, vec4f(0, 0, 0, 0) , vec4f(1, 1, 1, 1));
+      //   let ambient= vec4f(0.1, 0.1, 0.1, 1)*lightInfo.intensity;
+      //   color = emit + diffuse + specular + ambient;
+      //   color = toon(color,5);
+      // }
+      // else if (light.model[0]==3){
+      //   // BLINN-PHONG MODEL
+      //   // let R=reflect(lightInfo.lightdir, normal);
+      //   let viewDir= normalize(curPt);
+      //   var dist= lightInfo.dist;
+      //   let halfDir = normalize(lightInfo.lightdir + viewDir);
+      //   var specular= vec4f(1, 1, 1, 1)* lightInfo.intensity * pow(dot(halfDir, -normal), 100);
+      //   specular = clamp(specular, vec4f(0, 0, 0, 0) , vec4f(1, 1, 1, 1));
+      //   let ambient= vec4f(0.1, 0.1, 0.1, 1)*lightInfo.intensity;
+      //   color= emit + diffuse + specular;
+      // }
+
+
+       
+      break;
+
       }
+    }
+    // If we don't hit anything
+    else{
+      curHit = getNextHitValue(hits.x, curHit, minCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy); // xy
+      curHit = getNextHitValue(hits.x, curHit, maxCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy);
+      curHit = getNextHitValue(hits.x, curHit, minCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz); // yz
+      curHit = getNextHitValue(hits.x, curHit, maxCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz);
+      curHit = getNextHitValue(hits.x, curHit, minCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz); // xz
+      curHit = getNextHitValue(hits.x, curHit, maxCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz);
+      prevPos = vPos;
     }
     curHit += 0.002;
   }
