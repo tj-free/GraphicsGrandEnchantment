@@ -274,27 +274,47 @@ struct CellInfo { // this is packed in 64
   particleIndices: array<f32, 63>, // the particles in this cell
 }
 
+// struct to store the light
+struct Light {
+  intensity: vec4f,   // the light intensity
+  position: vec4f,    // where the light is
+  direction: vec4f,   // the light direction
+  attenuation: vec4f, // the attenuation factors
+  params: vec4f,      // other parameters such as cut-off, drop off, area width/height, and radius etc.
+  model: vec4u,
+}
+
+// a structure to store the computed light information
+struct LightInfo {
+  intensity: vec4f, // the final light intensity
+  lightdir: vec3f, // the final light direction
+  dist: f32, // the final light dist
+}
+
 // binding the camera pose
-@group(0) @binding(0) var<uniform> cameraPose: array<Camera, 2>;
+@group(0) @binding(0) var<storage> cameraPoseIn: array<Camera, 2>;
+@group(0) @binding(1) var<storage, read_write> cameraPoseOut: array<Camera, 2>;
 // binding the volume info
-@group(0) @binding(1) var<uniform> volInfo: VolInfo;
+@group(0) @binding(2) var<uniform> volInfo: VolInfo;
 // binding the volume data
-@group(0) @binding(2) var<storage> volData: array<f32>; // array<CellInfo>
+@group(0) @binding(3) var<storage> volData: array<f32>; // array<CellInfo>
 // binding the output texture to store the ray tracing results
-@group(0) @binding(3) var outTextureLeft: texture_storage_2d<rgba8unorm, write>;
-@group(0) @binding(4) var outTextureRight: texture_storage_2d<rgba8unorm, write>;
-@group(0) @binding(5) var leavesTexture: texture_2d<f32>;
-@group(0) @binding(6) var dirtTexture: texture_2d<f32>;
-@group(0) @binding(7) var grassTopTexture: texture_2d<f32>;
-@group(0) @binding(8) var grassSideTexture: texture_2d<f32>;
-@group(0) @binding(9) var snowySideTexture: texture_2d<f32>;
-@group(0) @binding(10) var logTexture: texture_2d<f32>;
-@group(0) @binding(11) var logSideTexture: texture_2d<f32>;
-@group(0) @binding(12) var snowyTopTexture: texture_2d<f32>;
-@group(0) @binding(13) var stoneTexture: texture_2d<f32>;
-@group(0) @binding(14) var leafParticleTexture: texture_2d<f32>;
-@group(0) @binding(15) var particleSheet: texture_2d<f32>;
-@group(0) @binding(16) var inSampler: sampler; // a texture sampler
+@group(0) @binding(4) var outTextureLeft: texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(5) var outTextureRight: texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(6) var leavesTexture: texture_2d<f32>;
+@group(0) @binding(7) var dirtTexture: texture_2d<f32>;
+@group(0) @binding(8) var grassTopTexture: texture_2d<f32>;
+@group(0) @binding(9) var grassSideTexture: texture_2d<f32>;
+@group(0) @binding(10) var snowySideTexture: texture_2d<f32>;
+@group(0) @binding(11) var logTexture: texture_2d<f32>;
+@group(0) @binding(12) var logSideTexture: texture_2d<f32>;
+@group(0) @binding(13) var snowyTopTexture: texture_2d<f32>;
+@group(0) @binding(14) var stoneTexture: texture_2d<f32>;
+@group(0) @binding(15) var leafParticleTexture: texture_2d<f32>;
+@group(0) @binding(16) var particleSheet: texture_2d<f32>;
+//binding the light
+@group(0) @binding(17) var<uniform> light: Light;
+@group(0) @binding(18) var inSampler: sampler; // texture sampler
 
 
 
@@ -303,14 +323,14 @@ struct CellInfo { // this is packed in 64
 // a function to transform the direction to the model coordiantes
 fn transformDir(d: vec3f, cameraId: u32) -> vec3f {
   // transform the direction using the camera pose
-  var out = applyMotorToDir(d, cameraPose[cameraId].motor);
+  var out = applyMotorToDir(d, cameraPoseIn[cameraId].motor);
   return out;
 }
 
 // a function to transform the start pt to the model coordiantes
 fn transformPt(pt: vec3f, cameraId: u32) -> vec3f {
   // transform the point using the camera pose
-  var out = applyMotorToPoint(pt, cameraPose[cameraId].motor);
+  var out = applyMotorToPoint(pt, cameraPoseIn[cameraId].motor);
   return out;
 }
 
@@ -447,7 +467,6 @@ fn faceMapping(viewDir: vec3f)-> i32{
 
 fn textureMapping(face: i32, hitPoint: vec3f) -> vec4f {
   // my box has different colors for each face
-  //NOTE TO SELF: REMOVE TEXTDIM, WE DON'T NEED IT
   var color: vec4f;
     switch(face) {
       case 0: { //front
@@ -491,20 +510,71 @@ fn textureMapping(face: i32, hitPoint: vec3f) -> vec4f {
     return color;
   }
 
+// a function to get the box emit color
+fn boxEmitColor() -> vec4f {
+  return vec4f(0, 0, 0, 1); // my box doesn't emit any color
+}
+
+// a function to compute the light intensity and direction
+fn getLightInfo(lightPos: vec3f, lightDir: vec3f, hitPoint: vec3f, objectNormal: vec3f) -> LightInfo {
+  // Note: here I implemented point light - you should modify this function for different light sources
+
+  //directional light
+  
+    // first, get the source intensity
+    var intensity = light.intensity; 
+    // compute the view direction
+    var viewDirection = normalize(lightDir);
+    // set the final light info
+    var out: LightInfo;
+    // the final light intensity depends on the view direction
+    out.intensity = intensity * max(dot(viewDirection, -objectNormal), 0);
+    // the final light diretion is the current view direction
+    out.lightdir = viewDirection;
+    out.dist= dot(hitPoint - lightPos,hitPoint - lightPos); 
+
+    return out;
+ 
+}
+
+
+// a function to transform hit point to the world coordiantes
+fn transformHitPoint(pt: vec3f) -> vec3f {
+  var out = pt * volInfo.sizes.xyz;
+  //TODO: transform the hit point into the world space - using the voxel motor - MAKE - just transfored
+  // out = applyMotorToPoint(out, currBox.motor);
+  return out;
+}
+
+// a function to transform normal to the world coordiantes
+fn transformNormal(n: vec3f) -> vec3f {
+  var out = n * volInfo.sizes.xyz;
+  //TODO: transform the normal into the world space - using the voxel motor - MAKE - just transfored
+
+  // out = applyMotorToDir(out, currBox.motor);
+  return normalize(out);
+}
+
 fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
   // find the start and end point
   var hits = rayVolumeIntersection(p, d);
+
+  if (hits.y < 0) {
+    hits.y = hits.x;
+    hits.x = 0;
+  }
 
   var curHit = vec2f(hits.x + 0.02, hits.z);
 
   let halfSize: vec3f = volInfo.dims.xyz * volInfo.sizes.xyz * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z);
   let voxelSize: vec3f = vec3f(1,1,1) * volInfo.sizes.xyz / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z); // normalized voxel size
 
-  var color = vec4f(0.f/255, 70.f/255, 140.f/255, 1.); // Bucknell Blue
+
+  var color = vec4f(0, 0, 0, 0.); // Bucknell Blue
   var prevPos: vec3f;
 
   while (curHit.x < hits.y) {
-    let curPt: vec3f = p + d * curHit.x + halfSize;
+    var curPt: vec3f = p + d * curHit.x + halfSize;
     let vPos = curPt / (voxelSize);
     var minCorner = floor(vPos);
     var maxCorner = ceil(vPos);
@@ -517,21 +587,106 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
       if (i32(volData[vIdx]) != 0) {
         var currFace=i32(curHit.y);//faceMapping(-d);
         if (volData[vIdx] < volInfo.dims.y * 0.1) {
-          // color = vec4f(255.f/255, 250.f/255, 250.f/255, 1.); // Snow
-          color = textureMapping(currFace, (vPos - minCorner) / (maxCorner - minCorner));
+          color = vec4f(255.f/255, 250.f/255, 250.f/255, 1.); // Snow
+          // color = textureMapping(currFace, (vPos - minCorner) / (maxCorner - minCorner));
         }
         else if (volData[vIdx] < volInfo.dims.y * 0.35) {
-          color = textureMapping(currFace, (vPos - minCorner) / (maxCorner - minCorner)); // Mountain
-          // color = vec4f(170.f/255, 170.f/255, 0.f/255, 1.); // Grass
+          // color = textureMapping(currFace, (vPos - minCorner) / (maxCorner - minCorner)); // Mountain
+          color = vec4f(170.f/255, 170.f/255, 0.f/255, 1.); // Grass
         }
         else if (volData[vIdx] < volInfo.dims.y * 0.6) {
-          color = textureMapping(currFace, (vPos - minCorner) / (maxCorner - minCorner)); 
-          //color = vec4f(0.f/255, 170.f/255, 0.f/255, 1.); // Grass
+          // color = textureMapping(currFace, (vPos - minCorner) / (maxCorner - minCorner)); 
+          color = vec4f(0.f/255, 170.f/255, 0.f/255, 1.); // Grass
         }
         else {
-          color = textureMapping(currFace, (vPos - minCorner) / (maxCorner - minCorner)); 
-          //color = vec4f(96.f/255, 177.f/255, 199.f/255, 1.); // Water
+          // color = textureMapping(currFace, (vPos - minCorner) / (maxCorner - minCorner)); 
+          color = vec4f(96.f/255, 177.f/255, 199.f/255, 0.5); // Water
+          // color += vec4f(0,0,20, 0.01); // Water
+          // if (color.w >= 1) {
+          //   color = vec4f(0, 0, 199.f/255, 1);
+          // }
+          // else {
+          //   curHit = getNextHitValue(hits.x, curHit, minCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy); // xy
+          //   curHit = getNextHitValue(hits.x, curHit, maxCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy);
+          //   curHit = getNextHitValue(hits.x, curHit, minCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz); // yz
+          //   curHit = getNextHitValue(hits.x, curHit, maxCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz);
+          //   curHit = getNextHitValue(hits.x, curHit, minCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz); // xz
+          //   curHit = getNextHitValue(hits.x, curHit, maxCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz);
+          //   prevPos = vPos;
+          //   continue;
+          // }
         }
+
+
+
+
+
+        //ADDED CODE FROM TRACEBOX LIGHT HERE
+        // here, I provide you with the Lambertian shading implementation
+        // You need to modify it for other shading model
+        // first, get the emit color
+        let emit = boxEmitColor(); 
+        // then, compute the diffuse color, which depends on the light source
+        //   1. get the box diffuse color - i.e. the material property of diffusion on the box
+        // var hitPt = spt + rdir * hitInfo.x;
+        curPt = transformHitPoint(curPt);
+        var diffuse = color; // get the box diffuse property
+        //   2. get the box normal
+        var normal = normalize(-vPos+prevPos);
+        //   3. transform the normal to the world coordinates
+        //   Note: here it is using the box pose/motor and scale. 
+        //         you will need to modify this transformation for different objects
+        normal = transformNormal(normal);
+        //   4. transform the light to the world coordinates
+        //   Note: My light is stationary, so Icancel the camera movement to keep it stationary
+        // let lightPos = applyMotorToPoint(light.position.xyz, reverse(cameraPose.motor));
+        // let lightDir = applyMotorToDir(light.direction.xyz, reverse(cameraPose.motor));
+        let lightPos = light.position.xyz;
+        let lightDir= light.direction.xyz;
+        //   5. transform the hit point to the world coordiantes
+        //   Note: the hit point is in the model coordiantes, need to transform back to the world
+        //   6. compute the light information
+        //   Note: I do the light computation in the world coordiantes because the light intensity depends on the distance and angles in the world coordiantes! If you do it in other coordinate system, make sure you transform them properly back to the world one.
+        var lightInfo = getLightInfo(lightPos, lightDir, curPt, normal);
+      
+        //   7. finally, modulate the diffuse color by the light
+        // lightInfo.intensity = toon(lightInfo.intensity, 5);
+        diffuse *= saturate(lightInfo.intensity);
+        // last, compute the final color. Here Lambertian = emit + diffuse
+        color = diffuse;
+
+        // if (light.model[0]==0){
+        //   // LAMBERTIAN MODEL
+        //   color = emit + diffuse;
+        // }
+        // else if (light.model[0]==1){
+        //   // PHONG MODEL
+        //   let R=reflect(lightInfo.lightdir, normal);
+        //   var specular= vec4f(1, 1, 1, 1)* lightInfo.intensity * pow(dot(rdir, -R),100);
+        //   specular = clamp(specular, vec4f(0, 0, 0, 0) , vec4f(1, 1, 1, 1));
+        //   let ambient= vec4f(0.1, 0.1, 0.1, 1)*lightInfo.intensity;
+        //   color = emit + diffuse + specular + ambient;
+        // }
+        // else if (light.model[0]==2){ 
+        //   // TOON MODEL
+        //   let R=reflect(lightInfo.lightdir, normal);
+        //   var specular= vec4f(1, 1, 1, 1)* lightInfo.intensity * pow(dot(rdir, -R),100);
+        //   specular = clamp(specular, vec4f(0, 0, 0, 0) , vec4f(1, 1, 1, 1));
+        //   let ambient= vec4f(0.1, 0.1, 0.1, 1)*lightInfo.intensity;
+        //   color = emit + diffuse + specular + ambient;
+        //   color = toon(color,5);
+        // }
+        // else if (light.model[0]==3){
+        //   // BLINN-PHONG MODEL
+        //   // let R=reflect(lightInfo.lightdir, normal);
+        //   let viewDir= normalize(curPt);
+        //   var dist= lightInfo.dist;
+        //   let halfDir = normalize(lightInfo.lightdir + viewDir);
+        //   var specular= vec4f(1, 1, 1, 1)* lightInfo.intensity * pow(dot(halfDir, -normal), 100);
+        //   specular = clamp(specular, vec4f(0, 0, 0, 0) , vec4f(1, 1, 1, 1));
+        //   let ambient= vec4f(0.1, 0.1, 0.1, 1)*lightInfo.intensity;
+        //   color= emit + diffuse + specular;
+        // }
         break;
       }
     }
@@ -557,6 +712,43 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
   }
 }
 
+fn raytrace(p: vec3f, d: vec3f, length: f32) -> bool {
+  // find the start and end point
+  var hits = rayVolumeIntersection(p, d);
+
+  var curHit = vec2f(hits.x + 0.02, hits.z);
+
+  let halfSize: vec3f = volInfo.dims.xyz * volInfo.sizes.xyz * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z);
+  let voxelSize: vec3f = vec3f(1,1,1) * volInfo.sizes.xyz / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z); // normalized voxel size
+
+  while (curHit.x < length) {
+    var curPt: vec3f = p + d * curHit.x + halfSize;
+    let vPos = curPt / (voxelSize);
+    var minCorner = floor(vPos);
+    var maxCorner = ceil(vPos);
+
+    if (all(vPos >= vec3f(0)) && all(vPos < volInfo.dims.xyz)) {
+      let vIdx: i32 = i32(vPos.z) * i32(volInfo.dims.x * volInfo.dims.y)
+                      + i32(vPos.y) * i32(volInfo.dims.x)
+                      + i32(vPos.x);
+      if (i32(volData[vIdx]) != 0) {
+        return true;
+      }
+    }
+    // If we don't hit anything
+    else{
+      curHit = getNextHitValue(hits.x, curHit, minCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy, 1); // xy
+      curHit = getNextHitValue(hits.x, curHit, maxCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy, 0);
+      curHit = getNextHitValue(hits.x, curHit, minCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz, 2); // yz
+      curHit = getNextHitValue(hits.x, curHit, maxCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz, 3);
+      curHit = getNextHitValue(hits.x, curHit, minCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz, 5); // xz
+      curHit = getNextHitValue(hits.x, curHit, maxCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz, 4);
+    }
+    curHit += 0.002;
+  }
+  return false;
+}
+
 @compute
 @workgroup_size(11, 11, 2)
 fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u, @builtin(workgroup_id) workgroup_id: vec3u) {
@@ -572,14 +764,23 @@ fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u, @built
   }
   if (uv.x < texDim.x && uv.y < texDim.y) {
     // compute the pixel size
-    let psize = vec2f(2, 2) / cameraPose[cameraId].res.xy * cameraPose[cameraId].focal.xy;
+    let psize = vec2f(2, 2) / cameraPoseIn[0].res.xy * cameraPoseIn[0].focal.xy;
     // orthogonal camera ray sent from each pixel center at z = 0
     var spt = vec3f(0, 0, 0);
-    var rdir = vec3f((f32(uv.x) + 0.5) * psize.x - cameraPose[cameraId].focal.x, (f32(uv.y) + 0.5) * psize.y - cameraPose[cameraId].focal.y, 1);
+    var rdir = vec3f((f32(uv.x) + 0.5) * psize.x - cameraPoseIn[0].focal.x, (f32(uv.y) + 0.5) * psize.y - cameraPoseIn[0].focal.y, 1);
     // apply transformation
     spt = transformPt(spt, cameraId);
     rdir = transformDir(rdir, cameraId);
 
     traceTerrain(uv, spt, rdir, cameraId);
+
+    cameraPoseOut[cameraId] = cameraPoseIn[cameraId];
+    // TODO: Fix raycasts not working
+    // if (!raytrace(spt, vec3f(0, 1, 0), 0.01)) {
+    //   let dt = createTranslator(vec3f(0, 0.01, 0));
+    //   let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
+      
+    //   cameraPoseOut[cameraId].motor = newpose;
+    // }
   }
 }
