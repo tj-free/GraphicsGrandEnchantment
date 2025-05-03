@@ -32,7 +32,10 @@ import VRRayTracer from './lib/Viz/VRRayTracer.js'
 import StandardTextObject from './lib/DSViz/StandardTextObject.js'
 import VolumeRenderingSimpleObject from './lib/DSViz/VolumeRenderingSimpleObject.js'
 import Camera from './lib/Viz/3DCamera.js'
+import Input from './lib/Input/Input.js'
 import VRInput from './lib/Input/VRInput.js';
+import DirectionalLight from './lib/Viz/DirectionalLight.js'
+
 
 async function init() {
   // Create a canvas tag
@@ -58,21 +61,28 @@ async function init() {
   [leftCamera, rightCamera], true, blockTextures.concat(particleTextures));
   
   var vrInput = new VRInput();
+  var input = new Input(canvasTag);
 
   await tracer.setTracerObject(tracerObj);
  
-  leftCamera.moveZ(-2);
-  leftCamera.moveY(0.5);
+  // leftCamera.moveZ(-2);
+  leftCamera.moveY(-2);
+  // leftCamera.moveZ(-5);
   // NOTE: cameras need to be rotated?
   // How do humans see
   // leftCamera.moveX(0.0298200368);
-  leftCamera.moveX(-0.008);
-  leftCamera.rotateY(5);
-  rightCamera.moveZ(-2);
-  rightCamera.moveY(0.5);
+  leftCamera.moveX(-0.000);
+  // leftCamera.rotateY(5);
+  // rightCamera.moveZ(-2);
+  rightCamera.moveY(-2);
   // rightCamera.moveX(-0.0298200368);
   rightCamera.moveX(0.008);
   rightCamera.rotateY(-5);
+
+  var directionalLight= new DirectionalLight();
+  tracerObj.updateLight(directionalLight);
+
+  
   
   let toggleMovement=true;
   
@@ -89,7 +99,8 @@ async function init() {
                                           '-=: Change Camera Focal X\n' +
                                           '[]: Change Camera Focal Y\n'+
                                           'U: Toggle Camera/Object\n'+
-                                          'B: Toggle Models');
+                                          'B: Toggle Models\n'+
+                                          '1: Toggle Weather');
   var movespeed = 0.05;
   var rotatespeed = 2;
   var focalXSpeed = 0.1;
@@ -185,9 +196,45 @@ async function init() {
         tracerObj.updateCameraFocal();
         break;
       case "u": case "U":
-        toggleMovement= !toggleMovement;
+       toggleMovement= !toggleMovement;
+       break;
+      case "1": 
+        // tracerObj.iterateWeatherLight(directionalLight, weatherLightValues, currWeather);
+        // currWeather = (currWeather + 1) %3; // cycle through values
+        Input.getWeather(tracerObj, directionalLight);
+        tracerObj.updateLight(directionalLight);
+        break;
+
   }
   });
+
+  
+
+
+ 
+    // Rotate camera horizontally (Y-axis) and vertically (X-axis)
+    document.addEventListener("mousemove", (event) => {
+      //console.log("Mouse moved X:", event.movementX);
+      //console.log("Mouse moved Y:", event.movementY);
+      canvasTag.requestPointerLock();
+
+      let dir = Math.atan(event.movementY / event.movementX);
+      let moved = Input.getMouseMovement()
+      const sensitivity = 0.05; // tune this based on feel
+      leftCamera.rotateY(-event.movementX * sensitivity);
+      rightCamera.rotateY(-event.movementX * sensitivity);
+
+      leftCamera.rotateX(event.movementY * sensitivity);
+      rightCamera.rotateX(event.movementY * sensitivity);
+
+
+    tracerObj.updateCameraPose(); // your own method to sync visuals
+    
+    });
+  
+
+
+   
   
   // Update FPS text
   setInterval(() => {

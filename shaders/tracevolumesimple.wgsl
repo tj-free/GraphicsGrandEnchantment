@@ -274,27 +274,47 @@ struct CellInfo { // this is packed in 64
   particleIndices: array<f32, 63>, // the particles in this cell
 }
 
+// struct to store the light
+struct Light {
+  intensity: vec4f,   // the light intensity
+  position: vec4f,    // where the light is
+  direction: vec4f,   // the light direction
+  attenuation: vec4f, // the attenuation factors
+  params: vec4f,      // other parameters such as cut-off, drop off, area width/height, and radius etc.
+  model: vec4u,
+}
+
+// a structure to store the computed light information
+struct LightInfo {
+  intensity: vec4f, // the final light intensity
+  lightdir: vec3f, // the final light direction
+  dist: f32, // the final light dist
+}
+
 // binding the camera pose
-@group(0) @binding(0) var<uniform> cameraPose: array<Camera, 2>;
+@group(0) @binding(0) var<storage> cameraPoseIn: array<Camera, 2>;
+@group(0) @binding(1) var<storage, read_write> cameraPoseOut: array<Camera, 2>;
 // binding the volume info
-@group(0) @binding(1) var<uniform> volInfo: VolInfo;
+@group(0) @binding(2) var<uniform> volInfo: VolInfo;
 // binding the volume data
-@group(0) @binding(2) var<storage> volData: array<f32>; // array<CellInfo>
+@group(0) @binding(3) var<storage> volData: array<f32>; // array<CellInfo>
 // binding the output texture to store the ray tracing results
-@group(0) @binding(3) var outTextureLeft: texture_storage_2d<rgba8unorm, write>;
-@group(0) @binding(4) var outTextureRight: texture_storage_2d<rgba8unorm, write>;
-@group(0) @binding(5) var leavesTexture: texture_2d<f32>;
-@group(0) @binding(6) var dirtTexture: texture_2d<f32>;
-@group(0) @binding(7) var grassTopTexture: texture_2d<f32>;
-@group(0) @binding(8) var grassSideTexture: texture_2d<f32>;
-@group(0) @binding(9) var snowySideTexture: texture_2d<f32>;
-@group(0) @binding(10) var logTexture: texture_2d<f32>;
-@group(0) @binding(11) var logSideTexture: texture_2d<f32>;
-@group(0) @binding(12) var snowyTopTexture: texture_2d<f32>;
-@group(0) @binding(13) var stoneTexture: texture_2d<f32>;
-@group(0) @binding(14) var leafParticleTexture: texture_2d<f32>;
-@group(0) @binding(15) var particleSheet: texture_2d<f32>;
-@group(0) @binding(16) var inSampler: sampler; // a texture sampler
+@group(0) @binding(4) var outTextureLeft: texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(5) var outTextureRight: texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(6) var leavesTexture: texture_2d<f32>;
+@group(0) @binding(7) var dirtTexture: texture_2d<f32>;
+@group(0) @binding(8) var grassTopTexture: texture_2d<f32>;
+@group(0) @binding(9) var grassSideTexture: texture_2d<f32>;
+@group(0) @binding(10) var snowySideTexture: texture_2d<f32>;
+@group(0) @binding(11) var logTexture: texture_2d<f32>;
+@group(0) @binding(12) var logSideTexture: texture_2d<f32>;
+@group(0) @binding(13) var snowyTopTexture: texture_2d<f32>;
+@group(0) @binding(14) var stoneTexture: texture_2d<f32>;
+@group(0) @binding(15) var leafParticleTexture: texture_2d<f32>;
+@group(0) @binding(16) var particleSheet: texture_2d<f32>;
+//binding the light
+@group(0) @binding(17) var<uniform> light: Light;
+@group(0) @binding(18) var inSampler: sampler; // texture sampler
 
 
 
@@ -303,14 +323,14 @@ struct CellInfo { // this is packed in 64
 // a function to transform the direction to the model coordiantes
 fn transformDir(d: vec3f, cameraId: u32) -> vec3f {
   // transform the direction using the camera pose
-  var out = applyMotorToDir(d, cameraPose[cameraId].motor);
+  var out = applyMotorToDir(d, cameraPoseIn[cameraId].motor);
   return out;
 }
 
 // a function to transform the start pt to the model coordiantes
 fn transformPt(pt: vec3f, cameraId: u32) -> vec3f {
   // transform the point using the camera pose
-  var out = applyMotorToPoint(pt, cameraPose[cameraId].motor);
+  var out = applyMotorToPoint(pt, cameraPoseIn[cameraId].motor);
   return out;
 }
 
@@ -606,6 +626,43 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
   }
 }
 
+fn raytrace(p: vec3f, d: vec3f, length: f32) -> bool {
+  // find the start and end point
+  var hits = rayVolumeIntersection(p, d);
+
+  var curHit = vec2f(hits.x + 0.02, hits.z);
+
+  let halfSize: vec3f = volInfo.dims.xyz * volInfo.sizes.xyz * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z);
+  let voxelSize: vec3f = vec3f(1,1,1) * volInfo.sizes.xyz / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z); // normalized voxel size
+
+  while (curHit.x < length) {
+    var curPt: vec3f = p + d * curHit.x + halfSize;
+    let vPos = curPt / (voxelSize);
+    var minCorner = floor(vPos);
+    var maxCorner = ceil(vPos);
+
+    if (all(vPos >= vec3f(0)) && all(vPos < volInfo.dims.xyz)) {
+      let vIdx: i32 = i32(vPos.z) * i32(volInfo.dims.x * volInfo.dims.y)
+                      + i32(vPos.y) * i32(volInfo.dims.x)
+                      + i32(vPos.x);
+      if (i32(volData[vIdx]) != 0) {
+        return true;
+      }
+    }
+    // If we don't hit anything
+    else{
+      curHit = getNextHitValue(hits.x, curHit, minCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy, 1); // xy
+      curHit = getNextHitValue(hits.x, curHit, maxCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy, 0);
+      curHit = getNextHitValue(hits.x, curHit, minCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz, 2); // yz
+      curHit = getNextHitValue(hits.x, curHit, maxCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz, 3);
+      curHit = getNextHitValue(hits.x, curHit, minCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz, 5); // xz
+      curHit = getNextHitValue(hits.x, curHit, maxCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz, 4);
+    }
+    curHit += 0.002;
+  }
+  return false;
+}
+
 @compute
 @workgroup_size(11, 11, 2)
 fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u, @builtin(workgroup_id) workgroup_id: vec3u) {
@@ -621,14 +678,23 @@ fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u, @built
   }
   if (uv.x < texDim.x && uv.y < texDim.y) {
     // compute the pixel size
-    let psize = vec2f(2, 2) / cameraPose[cameraId].res.xy * cameraPose[cameraId].focal.xy;
+    let psize = vec2f(2, 2) / cameraPoseIn[0].res.xy * cameraPoseIn[0].focal.xy;
     // orthogonal camera ray sent from each pixel center at z = 0
     var spt = vec3f(0, 0, 0);
-    var rdir = vec3f((f32(uv.x) + 0.5) * psize.x - cameraPose[cameraId].focal.x, (f32(uv.y) + 0.5) * psize.y - cameraPose[cameraId].focal.y, 1);
+    var rdir = vec3f((f32(uv.x) + 0.5) * psize.x - cameraPoseIn[0].focal.x, (f32(uv.y) + 0.5) * psize.y - cameraPoseIn[0].focal.y, 1);
     // apply transformation
     spt = transformPt(spt, cameraId);
     rdir = transformDir(rdir, cameraId);
 
     traceTerrain(uv, spt, rdir, cameraId);
+
+    cameraPoseOut[cameraId] = cameraPoseIn[cameraId];
+    // TODO: Fix raycasts not working
+    // if (!raytrace(spt, vec3f(0, 1, 0), 0.01)) {
+    //   let dt = createTranslator(vec3f(0, 0.01, 0));
+    //   let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
+      
+    //   cameraPoseOut[cameraId].motor = newpose;
+    // }
   }
 }
