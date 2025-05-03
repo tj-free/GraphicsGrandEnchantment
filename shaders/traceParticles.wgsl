@@ -335,36 +335,34 @@ struct LightInfo {
 @group(0) @binding(22) var<uniform> weather: f32;
 
 
-
-
-
-
 // @group(0) @binding(4) var<uniform> toggleModel: f32;
 
 // a function to transform the direction to the model coordiantes
 fn transformDir(d: vec3f, cameraId: u32) -> vec3f {
   // transform the direction using the camera pose
-  var out = applyMotorToDir(d, cameraPose[cameraId].motor);
+  var out = applyMotorToDir(d, cameraPoseIn[cameraId].motor);
   return out;
 }
 
 // a function to transform the start pt to the model coordiantes
 fn transformPt(pt: vec3f, cameraId: u32) -> vec3f {
   // transform the point using the camera pose
-  var out = applyMotorToPoint(pt, cameraPose[cameraId].motor);
+  var out = applyMotorToPoint(pt, cameraPoseIn[cameraId].motor);
   return out;
 }
 
 // a helper function to keep track of the two ray-volume hit values
-fn compareVolumeHitValues(curValue: vec2f, t: f32) -> vec2f {
+fn compareVolumeHitValues(curValue: vec3f, t: f32, faceIdx: i32) -> vec3f {
   var result = curValue;
   if (curValue.x < 0) { // no hit value yet
     result.x = t; // update the closest
+    result.z = f32(faceIdx); // keep track of which face it htis
   }
   else {
     if (t < curValue.x) { // if find a closer hit value
       result.y = curValue.x; // update the second closest
       result.x = t;          // update the closest
+      result.z = f32(faceIdx); // update the face index
     }
     else {
       if (curValue.y < 0) { // no second hit value yet
@@ -379,14 +377,14 @@ fn compareVolumeHitValues(curValue: vec2f, t: f32) -> vec2f {
 }
 
 // a helper function to compute the ray-volume hit values
-fn getVolumeHitValues(checkval: f32, halfsize: vec2f, pval: f32, dval: f32, p: vec2f, d: vec2f, curT: vec2f) -> vec2f {
+fn getVolumeHitValues(checkval: f32, halfsize: vec2f, pval: f32, dval: f32, p: vec2f, d: vec2f, curT: vec3f, faceIdx: i32) -> vec3f {
   var cur = curT;
   if (abs(dval) > EPSILON) {
     let t = (checkval - pval) / dval; // compute the current hit point to the check value
     if (t > 0) {
       let hPt = p + t * d;
       if (-halfsize.x < hPt.x && hPt.x < halfsize.x && -halfsize.y < hPt.y && hPt.y < halfsize.y) {
-        cur = compareVolumeHitValues(cur, t);
+        cur = compareVolumeHitValues(cur, t, faceIdx);
       }
     }
   }
@@ -394,35 +392,75 @@ fn getVolumeHitValues(checkval: f32, halfsize: vec2f, pval: f32, dval: f32, p: v
 }
 
 // a function to compute the start and end t values of the ray hitting the volume
-fn rayVolumeIntersection(p: vec3f, d: vec3f) -> vec2f {
-  var hitValues = vec2f(-1, -1);
+fn rayVolumeIntersection(p: vec3f, d: vec3f) -> vec3f {
+  var hitValues = vec3f(-1, -1, -1);
   let halfsize = volInfo.dims * volInfo.sizes * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z); // 1mm
-  //let halfsize = vec3f(0.5, 0.5, 0.5) * volInfo.sizes.xyz;
-  // hitPt = p + t * d => t = (hitPt - p) / d
-  hitValues = getVolumeHitValues(halfsize.z, halfsize.xy, p.z, d.z, p.xy, d.xy, hitValues); // z = halfsize.z
-  hitValues = getVolumeHitValues(-halfsize.z, halfsize.xy, p.z, d.z, p.xy, d.xy, hitValues); // z = -halfsize.z
-  hitValues = getVolumeHitValues(-halfsize.x, halfsize.yz, p.x, d.x, p.yz, d.yz, hitValues); // x = -halfsize.x
-  hitValues = getVolumeHitValues(halfsize.x, halfsize.yz, p.x, d.x, p.yz, d.yz, hitValues); // x = halfsize.x
-  hitValues = getVolumeHitValues(halfsize.y, halfsize.xz, p.y, d.y, p.xz, d.xz, hitValues); // y = halfsize.y
-  hitValues = getVolumeHitValues(-halfsize.y, halfsize.xz, p.y, d.y, p.xz, d.xz, hitValues); // y = -halfsize.y
+  hitValues = getVolumeHitValues(halfsize.z, halfsize.xy, p.z, d.z, p.xy, d.xy, hitValues, 1); // z = halfsize.z Back
+  hitValues = getVolumeHitValues(-halfsize.z, halfsize.xy, p.z, d.z, p.xy, d.xy, hitValues, 0); // z = -halfsize.z Front
+  hitValues = getVolumeHitValues(-halfsize.x, halfsize.yz, p.x, d.x, p.yz, d.yz, hitValues, 2); // x = -halfsize.x Left
+  hitValues = getVolumeHitValues(halfsize.x, halfsize.yz, p.x, d.x, p.yz, d.yz, hitValues, 3); // x = halfsize.x Right
+  hitValues = getVolumeHitValues(halfsize.y, halfsize.xz, p.y, d.y, p.xz, d.xz, hitValues, 5); // y = halfsize.y Bottom
+  hitValues = getVolumeHitValues(-halfsize.y, halfsize.xz, p.y, d.y, p.xz, d.xz, hitValues, 4); // y = -halfsize.y Top 
   return hitValues;
 }
 
 // a helper function to get the next hit value
-fn getNextHitValue(startT: f32, curT: f32, checkval: f32, minCorner: vec2f, maxCorner: vec2f, pval: f32, dval: f32, p: vec2f, d: vec2f) -> f32 {
+fn getNextHitValue(startT: f32, curT: vec2f, checkval: f32, minCorner: vec2f, maxCorner: vec2f, pval: f32, dval: f32, p: vec2f, d: vec2f, faceIdx: i32) -> vec2f {
   var cur = curT;
   if (abs(dval) > EPSILON) {
     let t = (checkval - pval) / dval; // compute the current hit point to the check value
     let hPt = p + t * d;
     if (minCorner.x < hPt.x && hPt.x < maxCorner.x && minCorner.y < hPt.y && hPt.y < maxCorner.y) {
-      if (t > startT && cur < t) {
-        cur = t;
+      if (t > startT && cur.x < t) {
+        cur.x = t;
+        cur.y = f32(faceIdx);
       }
     }
   }
   return cur;
 }
-fn faceMapping(normDir: vec3f)-> i32{
+
+fn faceMapping(viewDir: vec3f)-> i32{
+  // idea: use dot product to find which face normal is the most parallel to the current (negative) ray direction [callled it viewDir]
+  var mostParallelFace = -1; // Unknown face
+  var maxDotValue = -1f;
+
+  var dotValue = dot(viewDir, vec3f(0, 0, -1)); // Front
+  if (dotValue > maxDotValue) {
+    maxDotValue = dotValue;
+    mostParallelFace = 0;
+  }
+
+  dotValue = dot(viewDir, vec3f(0, 0, 1)); // Back
+  if (dotValue > maxDotValue) {
+    maxDotValue = dotValue;
+    mostParallelFace = 1;
+  }
+
+  dotValue = dot(viewDir, vec3f(-1,0,0)); // Left
+  if (dotValue > maxDotValue) {
+    maxDotValue = dotValue;
+    mostParallelFace = 2;
+  }
+
+  dotValue = dot(viewDir, vec3f(1,0,0)); // Right
+  if (dotValue > maxDotValue) {
+    maxDotValue = dotValue;
+    mostParallelFace = 3;
+  }
+
+  dotValue = dot(viewDir, vec3f(0,-1,0)); // Top
+  if (dotValue > maxDotValue) {
+    maxDotValue = dotValue;
+    mostParallelFace = 4;
+  }
+  dotValue = dot(viewDir, vec3f(0,1,0)); // Down
+  if (dotValue > maxDotValue) {
+    maxDotValue = dotValue;
+    mostParallelFace = 5;
+  }
+  return mostParallelFace;
+/*
   if (all(normDir==vec3f(0,0,-1))){ // Front
     return 0;
   }
@@ -442,7 +480,10 @@ fn faceMapping(normDir: vec3f)-> i32{
     return 5;
   }
   else{return 4;} // Else
-}
+  */
+} 
+
+
 
 fn textureMapping(face: i32, hitPoint: vec3f) -> vec4f {
   // my box has different colors for each face
@@ -451,33 +492,33 @@ fn textureMapping(face: i32, hitPoint: vec3f) -> vec4f {
       case 0: { //front
         let textDim=vec2f(textureDimensions(grassSideTexture,0));
         // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
-        color=textureLoad(grassSideTexture, vec2i((hitPoint.xy/(volInfo.sizes.xy))*textDim),0);
+        color=textureSampleLevel(grassSideTexture, inSampler, hitPoint.xy,0);
         break;
       }
       case 1: { //back
         let textDim=vec2f(textureDimensions(grassSideTexture,0));
         // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
-        color=textureLoad(grassSideTexture, vec2i((hitPoint.xy/(volInfo.sizes.xy))*textDim),0);
+        color=textureSampleLevel(grassSideTexture, inSampler, hitPoint.xy, 0);
         break;
       }
       case 2: { //left
         let textDim=vec2f(textureDimensions(grassSideTexture,0));
-        color = textureLoad(grassSideTexture, vec2i((hitPoint.yz/(volInfo.sizes.yz))*textDim),0);
+        color = textureSampleLevel(grassSideTexture, inSampler, hitPoint.yz,0);
         break;
       }
       case 3: { //right
         let textDim=vec2f(textureDimensions(grassSideTexture,0));
-        color = textureLoad(grassSideTexture, vec2i((hitPoint.yz/(volInfo.sizes.yz))*textDim),0);
+        color = textureSampleLevel(grassSideTexture, inSampler, hitPoint.yz,0);
         break;
       }
       case 4: { //top
         let textDim=vec2f(textureDimensions(grassTopTexture,0));
-        color = textureLoad(grassTopTexture, vec2i((hitPoint.xz/(volInfo.sizes.xz))*textDim),0);
+        color = textureSampleLevel(grassTopTexture, inSampler, hitPoint.xz,0);
         break;
       }
       case 5: { //down
         let textDim=vec2f(textureDimensions(dirtTexture,0));
-        color = textureLoad(dirtTexture, vec2i((hitPoint.xz-vec2f(-0.5))*textDim),0);
+        color = textureSampleLevel(dirtTexture, inSampler, hitPoint.xz,0);
         break;
       }
       default: {
@@ -485,8 +526,54 @@ fn textureMapping(face: i32, hitPoint: vec3f) -> vec4f {
         break;
       }
     }
+    //color = vec4f(1, 0, 0, 1);  
     return color;
   }
+
+// a function to get the box emit color
+fn boxEmitColor() -> vec4f {
+  return vec4f(0, 0, 0, 1); // my box doesn't emit any color
+}
+
+// a function to compute the light intensity and direction
+fn getLightInfo(lightPos: vec3f, lightDir: vec3f, hitPoint: vec3f, objectNormal: vec3f) -> LightInfo {
+  // Note: here I implemented point light - you should modify this function for different light sources
+
+  //directional light
+  
+    // first, get the source intensity
+    var intensity = light.intensity; 
+    // compute the view direction
+    var viewDirection = normalize(lightDir);
+    // set the final light info
+    var out: LightInfo;
+    // the final light intensity depends on the view direction
+    out.intensity = intensity * max(dot(viewDirection, -objectNormal), 0);
+    // the final light diretion is the current view direction
+    out.lightdir = viewDirection;
+    out.dist= dot(hitPoint - lightPos,hitPoint - lightPos); 
+
+    return out;
+ 
+}
+
+
+// a function to transform hit point to the world coordiantes
+fn transformHitPoint(pt: vec3f) -> vec3f {
+  var out = pt * volInfo.sizes.xyz;
+  //TODO: transform the hit point into the world space - using the voxel motor - MAKE - just transfored
+  // out = applyMotorToPoint(out, currBox.motor);
+  return out;
+}
+
+// a function to transform normal to the world coordiantes
+fn transformNormal(n: vec3f) -> vec3f {
+  var out = n * volInfo.sizes.xyz;
+  //TODO: transform the normal into the world space - using the voxel motor - MAKE - just transfored
+
+  // out = applyMotorToDir(out, currBox.motor);
+  return normalize(out);
+}
 
 fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
   // find camera directions
@@ -497,19 +584,23 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
   // find the start and end point
   var hits = rayVolumeIntersection(p, d);
 
+	if (hits.y < 0) {
+    hits.y = hits.x;
+    hits.x = 0;
+  }
 
-  var curHit = hits.x + 0.02;
+  var curHit = vec2f(hits.x + 0.02, hits.z);
 
 
   let halfSize: vec3f = volInfo.dims.xyz * volInfo.sizes.xyz * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z);
   let voxelSize: vec3f = vec3f(1,1,1) * volInfo.sizes.xyz / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z); // normalized voxel size
 
 
-  var color = vec4f(0.f/255, 56.f/255, 101.f/255, 1.); // Bucknell Blue
+  var color = vec4f(0, 0, 0, 0.); // Bucknell Blue
   var prevPos: vec3f;
 
-  while (curHit < hits.y) {
-    let curPt: vec3f = p + d * curHit + halfSize;
+  while (curHit.x < hits.y) {
+    var curPt: vec3f = p + d * curHit.x + halfSize;
     let vPos = curPt / (voxelSize);
     var minCorner = floor(vPos);
     var maxCorner = ceil(vPos);
@@ -525,21 +616,70 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
       
       
       if (i32(volData[vIdx].terrainType) != 0) {
-        var currFace=faceMapping(vPos-prevPos);
-        if (f32(volData[vIdx].terrainType) < (volInfo.dims.y * 0.1)) {
-          // color = vec4f(255.f/255, 250.f/255, 250.f/255, 1.); // Snow
-          color = textureMapping(currFace, curPt);
+        var currFace=i32(curHit.y);//faceMapping(-d);
+        if (volData[vIdx].terrainType < volInfo.dims.y * 0.1) {
+          color = vec4f(255.f/255, 250.f/255, 250.f/255, 1.); // Snow
+          // color = textureMapping(currFace, (vPos - minCorner) / (maxCorner - minCorner));
         }
-        else if (f32(volData[vIdx].terrainType) < (volInfo.dims.y * 0.35)) {
-          color = textureMapping(currFace, curPt); // Mountain
-          // color = vec4f(170.f/255, 170.f/255, 0.f/255, 1.); // Grass
+        else if (volData[vIdx].terrainType < volInfo.dims.y * 0.35) {
+          // color = textureMapping(currFace, (vPos - minCorner) / (maxCorner - minCorner)); // Mountain
+          color = vec4f(170.f/255, 170.f/255, 0.f/255, 1.); // Grass
         }
-        else if (f32(volData[vIdx].terrainType) < (volInfo.dims.y * 0.6)) {
+        else if (volData[vIdx].terrainType < volInfo.dims.y * 0.6) {
+          // color = textureMapping(currFace, (vPos - minCorner) / (maxCorner - minCorner)); 
           color = vec4f(0.f/255, 170.f/255, 0.f/255, 1.); // Grass
+        } else {
+          // color = textureMapping(currFace, (vPos - minCorner) / (maxCorner - minCorner)); 
+          color = vec4f(96.f/255, 177.f/255, 199.f/255, 0.5); // Water
+          // color += vec4f(0,0,20, 0.01); // Water
+          // if (color.w >= 1) {
+          //   color = vec4f(0, 0, 199.f/255, 1);
+          // }
+          // else {
+          //   curHit = getNextHitValue(hits.x, curHit, minCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy); // xy
+          //   curHit = getNextHitValue(hits.x, curHit, maxCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy);
+          //   curHit = getNextHitValue(hits.x, curHit, minCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz); // yz
+          //   curHit = getNextHitValue(hits.x, curHit, maxCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz);
+          //   curHit = getNextHitValue(hits.x, curHit, minCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz); // xz
+          //   curHit = getNextHitValue(hits.x, curHit, maxCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz);
+          //   prevPos = vPos;
+          //   continue;
+          // }
         }
-        else {
-          color = vec4f(96.f/255, 177.f/255, 199.f/255, 1.); // Water
-        }
+        //ADDED CODE FROM TRACEBOX LIGHT HERE
+        // here, I provide you with the Lambertian shading implementation
+        // You need to modify it for other shading model
+        // first, get the emit color
+        let emit = boxEmitColor(); 
+        // then, compute the diffuse color, which depends on the light source
+        //   1. get the box diffuse color - i.e. the material property of diffusion on the box
+        // var hitPt = spt + rdir * hitInfo.x;
+        curPt = transformHitPoint(curPt);
+        var diffuse = color; // get the box diffuse property
+        //   2. get the box normal
+        var normal = normalize(-vPos+prevPos);
+        //   3. transform the normal to the world coordinates
+        //   Note: here it is using the box pose/motor and scale. 
+        //         you will need to modify this transformation for different objects
+        normal = transformNormal(normal);
+        //   4. transform the light to the world coordinates
+        //   Note: My light is stationary, so Icancel the camera movement to keep it stationary
+        // let lightPos = applyMotorToPoint(light.position.xyz, reverse(cameraPose.motor));
+        // let lightDir = applyMotorToDir(light.direction.xyz, reverse(cameraPose.motor));
+        let lightPos = light.position.xyz;
+        let lightDir= light.direction.xyz;
+        //   5. transform the hit point to the world coordiantes
+        //   Note: the hit point is in the model coordiantes, need to transform back to the world
+        //   6. compute the light information
+        //   Note: I do the light computation in the world coordiantes because the light intensity depends on the distance and angles in the world coordiantes! If you do it in other coordinate system, make sure you transform them properly back to the world one.
+        var lightInfo = getLightInfo(lightPos, lightDir, curPt, normal);
+      
+        //   7. finally, modulate the diffuse color by the light
+        // lightInfo.intensity = toon(lightInfo.intensity, 5);
+        diffuse *= saturate(lightInfo.intensity);
+        // last, compute the final color. Here Lambertian = emit + diffuse
+        color = diffuse;
+        
         break;
       } else {
         // we're hitting air, render particles
@@ -578,15 +718,15 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
     }
     // If we don't hit anything
     else{
-      curHit = getNextHitValue(hits.x, curHit, minCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy); // xy
-      curHit = getNextHitValue(hits.x, curHit, maxCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy);
-      curHit = getNextHitValue(hits.x, curHit, minCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz); // yz
-      curHit = getNextHitValue(hits.x, curHit, maxCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz);
-      curHit = getNextHitValue(hits.x, curHit, minCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz); // xz
-      curHit = getNextHitValue(hits.x, curHit, maxCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz);
+      curHit = getNextHitValue(hits.x, curHit, minCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy, 1); // xy
+      curHit = getNextHitValue(hits.x, curHit, maxCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy, 0);
+      curHit = getNextHitValue(hits.x, curHit, minCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz, 2); // yz
+      curHit = getNextHitValue(hits.x, curHit, maxCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz, 3);
+      curHit = getNextHitValue(hits.x, curHit, minCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz, 5); // xz
+      curHit = getNextHitValue(hits.x, curHit, maxCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz, 4);
       prevPos = vPos;
     }
-    curHit += 0.002;
+    curHit.x += 0.002;
   }
   // textureStore(outTextureRight, uv, color);
   // TODO: Fix the right texture not texturing
@@ -596,6 +736,43 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
   else {
     textureStore(outTextureRight, uv, color);
   }
+}
+
+fn raytrace(p: vec3f, d: vec3f, length: f32) -> bool {
+  // find the start and end point
+  var hits = rayVolumeIntersection(p, d);
+
+  var curHit = vec2f(hits.x + 0.02, hits.z);
+
+  let halfSize: vec3f = volInfo.dims.xyz * volInfo.sizes.xyz * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z);
+  let voxelSize: vec3f = vec3f(1,1,1) * volInfo.sizes.xyz / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z); // normalized voxel size
+
+  while (curHit.x < length) {
+    var curPt: vec3f = p + d * curHit.x + halfSize;
+    let vPos = curPt / (voxelSize);
+    var minCorner = floor(vPos);
+    var maxCorner = ceil(vPos);
+
+    if (all(vPos >= vec3f(0)) && all(vPos < volInfo.dims.xyz)) {
+      let vIdx: i32 = i32(vPos.z) * i32(volInfo.dims.x * volInfo.dims.y)
+                      + i32(vPos.y) * i32(volInfo.dims.x)
+                      + i32(vPos.x);
+      if (i32(volData[vIdx]) != 0) {
+        return true;
+      }
+    }
+    // If we don't hit anything
+    else{
+      curHit = getNextHitValue(hits.x, curHit, minCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy, 1); // xy
+      curHit = getNextHitValue(hits.x, curHit, maxCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy, 0);
+      curHit = getNextHitValue(hits.x, curHit, minCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz, 2); // yz
+      curHit = getNextHitValue(hits.x, curHit, maxCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz, 3);
+      curHit = getNextHitValue(hits.x, curHit, minCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz, 5); // xz
+      curHit = getNextHitValue(hits.x, curHit, maxCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz, 4);
+    }
+    curHit += 0.002;
+  }
+  return false;
 }
 
 @compute
@@ -665,16 +842,23 @@ fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u, @built
   }
   if (uv.x < texDim.x && uv.y < texDim.y) {
     // compute the pixel size
-    let psize = vec2f(2, 2) / cameraPose[cameraId].res.xy * cameraPose[cameraId].focal.xy;
+    let psize = vec2f(2, 2) / cameraPoseIn[0].res.xy * cameraPoseIn[0].focal.xy;
     // orthogonal camera ray sent from each pixel center at z = 0
     var spt = vec3f(0, 0, 0);
-    var rdir = vec3f((f32(uv.x) + 0.5) * psize.x - cameraPose[cameraId].focal.x, (f32(uv.y) + 0.5) * psize.y - cameraPose[cameraId].focal.y, 1);
+    var rdir = vec3f((f32(uv.x) + 0.5) * psize.x - cameraPoseIn[0].focal.x, (f32(uv.y) + 0.5) * psize.y - cameraPoseIn[0].focal.y, 1);
     // apply transformation
     spt = transformPt(spt, cameraId);
     rdir = transformDir(rdir, cameraId);
-    // pass also the camera up, right, forawrd direction
-    
 
     traceTerrain(uv, spt, rdir, cameraId);
+
+    cameraPoseOut[cameraId] = cameraPoseIn[cameraId];
+    // TODO: Fix raycasts not working
+    // if (!raytrace(spt, vec3f(0, 1, 0), 0.01)) {
+    //   let dt = createTranslator(vec3f(0, 0.01, 0));
+    //   let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
+      
+    //   cameraPoseOut[cameraId].motor = newpose;
+    // }
   }
 }
