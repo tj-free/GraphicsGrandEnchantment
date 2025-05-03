@@ -310,7 +310,7 @@ struct LightInfo {
 @group(0) @binding(0) var<storage> cameraPoseIn: array<Camera, 2>;
 @group(0) @binding(1) var<storage, read_write> cameraPoseOut: array<Camera, 2>;
 // binding the volume info
-@group(0) @binding(2) var<uniform> volInfo: VolInfo;
+@group(0) @binding(2) var<storage> volInfo: VolInfo;
 // binding the volume data
 @group(0) @binding(3) var<storage, read_write> volData: array<CellInfo>;
 // binding the output texture to store the ray tracing results
@@ -617,15 +617,15 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
       
       if (i32(volData[vIdx].terrainType) != 0) {
         var currFace=i32(curHit.y);//faceMapping(-d);
-        if (volData[vIdx].terrainType < volInfo.dims.y * 0.1) {
+        if (f32(volData[vIdx].terrainType) < volInfo.dims.y * 0.1) {
           color = vec4f(255.f/255, 250.f/255, 250.f/255, 1.); // Snow
           // color = textureMapping(currFace, (vPos - minCorner) / (maxCorner - minCorner));
         }
-        else if (volData[vIdx].terrainType < volInfo.dims.y * 0.35) {
+        else if (f32(volData[vIdx].terrainType) < volInfo.dims.y * 0.35) {
           // color = textureMapping(currFace, (vPos - minCorner) / (maxCorner - minCorner)); // Mountain
           color = vec4f(170.f/255, 170.f/255, 0.f/255, 1.); // Grass
         }
-        else if (volData[vIdx].terrainType < volInfo.dims.y * 0.6) {
+        else if (f32(volData[vIdx].terrainType) < volInfo.dims.y * 0.6) {
           // color = textureMapping(currFace, (vPos - minCorner) / (maxCorner - minCorner)); 
           color = vec4f(0.f/255, 170.f/255, 0.f/255, 1.); // Grass
         } else {
@@ -757,7 +757,7 @@ fn raytrace(p: vec3f, d: vec3f, length: f32) -> bool {
       let vIdx: i32 = i32(vPos.z) * i32(volInfo.dims.x * volInfo.dims.y)
                       + i32(vPos.y) * i32(volInfo.dims.x)
                       + i32(vPos.x);
-      if (i32(volData[vIdx]) != 0) {
+      if (volData[vIdx].terrainType != 0) {
         return true;
       }
     }
