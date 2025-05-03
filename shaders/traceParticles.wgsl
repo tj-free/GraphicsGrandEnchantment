@@ -287,32 +287,55 @@ struct Particle {
   range: f32,
 }
 
+// struct to store the light
+struct Light {
+  intensity: vec4f,   // the light intensity
+  position: vec4f,    // where the light is
+  direction: vec4f,   // the light direction
+  attenuation: vec4f, // the attenuation factors
+  params: vec4f,      // other parameters such as cut-off, drop off, area width/height, and radius etc.
+  model: vec4u,
+}
+
+// a structure to store the computed light information
+struct LightInfo {
+  intensity: vec4f, // the final light intensity
+  lightdir: vec3f, // the final light direction
+  dist: f32, // the final light dist
+}
+
 // make an atomic array to store all of the particles that need to be loaded
 
 // binding the camera pose
-@group(0) @binding(0) var<uniform> cameraPose: array<Camera, 2>;
+@group(0) @binding(0) var<storage> cameraPoseIn: array<Camera, 2>;
+@group(0) @binding(1) var<storage, read_write> cameraPoseOut: array<Camera, 2>;
 // binding the volume info
-@group(0) @binding(1) var<uniform> volInfo: VolInfo;
+@group(0) @binding(2) var<uniform> volInfo: VolInfo;
 // binding the volume data
-@group(0) @binding(2) var<storage, read_write> volData: array<CellInfo>;
+@group(0) @binding(3) var<storage, read_write> volData: array<CellInfo>;
 // binding the output texture to store the ray tracing results
-@group(0) @binding(3) var outTextureLeft: texture_storage_2d<rgba8unorm, write>;
-@group(0) @binding(4) var outTextureRight: texture_storage_2d<rgba8unorm, write>;
-@group(0) @binding(5) var leavesTexture: texture_2d<f32>;
-@group(0) @binding(6) var dirtTexture: texture_2d<f32>;
-@group(0) @binding(7) var grassTopTexture: texture_2d<f32>;
-@group(0) @binding(8) var grassSideTexture: texture_2d<f32>;
-@group(0) @binding(9) var snowySideTexture: texture_2d<f32>;
-@group(0) @binding(10) var logTexture: texture_2d<f32>;
-@group(0) @binding(11) var logSideTexture: texture_2d<f32>;
-@group(0) @binding(12) var snowyTopTexture: texture_2d<f32>;
-@group(0) @binding(13) var stoneTexture: texture_2d<f32>;
-@group(0) @binding(14) var leafParticleTexture: texture_2d<f32>;
-@group(0) @binding(15) var particleSheet: texture_2d<f32>;
-@group(0) @binding(16) var<storage> particlesIn: array<Particle>;
-@group(0) @binding(17) var<storage,read_write> particlesOut: array<Particle>;
-@group(0) @binding(18) var<uniform> time: f32;
-@group(0) @binding(19) var<uniform> weather: f32;
+@group(0) @binding(4) var outTextureLeft: texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(5) var outTextureRight: texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(6) var leavesTexture: texture_2d<f32>;
+@group(0) @binding(7) var dirtTexture: texture_2d<f32>;
+@group(0) @binding(8) var grassTopTexture: texture_2d<f32>;
+@group(0) @binding(9) var grassSideTexture: texture_2d<f32>;
+@group(0) @binding(10) var snowySideTexture: texture_2d<f32>;
+@group(0) @binding(11) var logTexture: texture_2d<f32>;
+@group(0) @binding(12) var logSideTexture: texture_2d<f32>;
+@group(0) @binding(13) var snowyTopTexture: texture_2d<f32>;
+@group(0) @binding(14) var stoneTexture: texture_2d<f32>;
+@group(0) @binding(15) var leafParticleTexture: texture_2d<f32>;
+@group(0) @binding(16) var particleSheet: texture_2d<f32>;
+@group(0) @binding(17) var<uniform> light: Light;
+@group(0) @binding(18) var inSampler: sampler; // texture sampler
+@group(0) @binding(19) var<storage> particlesIn: array<Particle>;
+@group(0) @binding(20) var<storage,read_write> particlesOut: array<Particle>;
+@group(0) @binding(21) var<uniform> time: f32;
+@group(0) @binding(22) var<uniform> weather: f32;
+
+
+
 
 
 
