@@ -647,33 +647,14 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
         // You need to modify it for other shading model
         // first, get the emit color
         let emit = boxEmitColor(); 
-        // then, compute the diffuse color, which depends on the light source
-        //   1. get the box diffuse color - i.e. the material property of diffusion on the box
-        // var hitPt = spt + rdir * hitInfo.x;
         curPt = transformHitPoint(curPt);
         var diffuse = color; // get the box diffuse property
-        //   2. get the box normal
         var normal = normalize(-vPos+prevPos);
-        //   3. transform the normal to the world coordinates
-        //   Note: here it is using the box pose/motor and scale. 
-        //         you will need to modify this transformation for different objects
         normal = transformNormal(normal);
-        //   4. transform the light to the world coordinates
-        //   Note: My light is stationary, so Icancel the camera movement to keep it stationary
-        // let lightPos = applyMotorToPoint(light.position.xyz, reverse(cameraPose.motor));
-        // let lightDir = applyMotorToDir(light.direction.xyz, reverse(cameraPose.motor));
         let lightPos = light.position.xyz;
         let lightDir= light.direction.xyz;
-        //   5. transform the hit point to the world coordiantes
-        //   Note: the hit point is in the model coordiantes, need to transform back to the world
-        //   6. compute the light information
-        //   Note: I do the light computation in the world coordiantes because the light intensity depends on the distance and angles in the world coordiantes! If you do it in other coordinate system, make sure you transform them properly back to the world one.
         var lightInfo = getLightInfo(lightPos, lightDir, curPt, normal);
-      
-        //   7. finally, modulate the diffuse color by the light
-        // lightInfo.intensity = toon(lightInfo.intensity, 5);
         diffuse *= saturate(lightInfo.intensity);
-        // last, compute the final color. Here Lambertian = emit + diffuse
         color = diffuse;
         break;
       }
@@ -721,6 +702,7 @@ fn raytrace(p: vec3f, d: vec3f, length: f32) -> bool {
       let vIdx: i32 = i32(vPos.z) * i32(volInfo.dims.x * volInfo.dims.y)
                       + i32(vPos.y) * i32(volInfo.dims.x)
                       + i32(vPos.x);
+
       if (i32(volData[vIdx]) != 0) {
         return true;
       }
@@ -734,7 +716,7 @@ fn raytrace(p: vec3f, d: vec3f, length: f32) -> bool {
       curHit = getNextHitValue(hits.x, curHit, minCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz, 5); // xz
       curHit = getNextHitValue(hits.x, curHit, maxCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz, 4);
     }
-    curHit += 0.002;
+    curHit.x += 0.002;
   }
   return false;
 }
@@ -754,10 +736,10 @@ fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u, @built
   }
   if (uv.x < texDim.x && uv.y < texDim.y) {
     // compute the pixel size
-    let psize = vec2f(2, 2) / cameraPoseIn[0].res.xy * cameraPoseIn[0].focal.xy;
+    let psize = vec2f(2, 2) / cameraPoseIn[cameraId].res.xy * cameraPoseIn[cameraId].focal.xy;
     // orthogonal camera ray sent from each pixel center at z = 0
     var spt = vec3f(0, 0, 0);
-    var rdir = vec3f((f32(uv.x) + 0.5) * psize.x - cameraPoseIn[0].focal.x, (f32(uv.y) + 0.5) * psize.y - cameraPoseIn[0].focal.y, 1);
+    var rdir = vec3f((f32(uv.x) + 0.5) * psize.x - cameraPoseIn[cameraId].focal.x, (f32(uv.y) + 0.5) * psize.y - cameraPoseIn[cameraId].focal.y, 1);
     // apply transformation
     spt = transformPt(spt, cameraId);
     rdir = transformDir(rdir, cameraId);
@@ -766,11 +748,10 @@ fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u, @built
 
     cameraPoseOut[cameraId] = cameraPoseIn[cameraId];
     // TODO: Fix raycasts not working
-    // if (!raytrace(spt, vec3f(0, 1, 0), 0.01)) {
-    //   let dt = createTranslator(vec3f(0, 0.01, 0));
-    //   let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
-      
-    //   cameraPoseOut[cameraId].motor = newpose;
-    // }
+    if (!raytrace(spt, vec3f(0, 1, 0), 0.1)) {
+      let dt = createTranslator(vec3f(0, 0.01, 0));
+      let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
+      cameraPoseOut[cameraId].motor = newpose;
+    }
   }
 }
