@@ -285,6 +285,11 @@ struct Particle {
   wind: f32,
   lifetime: f32,
   range: f32,
+  
+  dummy1: f32,
+  dummy2: vec2f,
+  dummy3: vec4f,
+  dummy4: vec4f,
 }
 
 // struct to store the light
@@ -699,7 +704,7 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
             // determine if hitPt inside the quad centered at the particle using right and up
             let uv = vec2f(dot(right, hitPt - particle.p.xyz), dot(up, hitPt - particle.p.xyz)); 
 
-            let size = 1.f;
+            let size = 4.;
             if ( ((abs(uv.x)) < size/2) && (abs(uv.y) < size/2) ) {   
               color = vec4f(1.,1.,1.,1.);
               // see the particle, 
@@ -799,7 +804,7 @@ fn updateParticle(@builtin(global_invocation_id) global_id: vec3u) {
     particlesOut[idx] = particlesIn[idx];
 
     // do your particle simulation and update (just make them fall for now)
-    particlesOut[idx].p.y = particlesIn[idx].p.y - 0.01;
+    particlesOut[idx].p.y = particlesIn[idx].p.y + 0.01;
 
     // based on the new particle location, put them into a cell
     var p = particlesOut[idx].p.xyz;
@@ -815,7 +820,7 @@ fn updateParticle(@builtin(global_invocation_id) global_id: vec3u) {
     let terrain = volData[vIdx].terrainType;
     if (i32(terrain) != 0) {
       // if it is non-air type, destroy the particle/respawn it
-      particlesOut[idx].p.y = particlesIn[idx].pInit.y;
+      particlesOut[idx].p.y = 1.0; //particlesIn[idx].pInit.y;
     } else {
       // Otherwise, set it to the cell
       // increase the number of particles in the cell
