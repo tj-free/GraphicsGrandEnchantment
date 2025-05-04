@@ -338,10 +338,115 @@ struct LightInfo {
 @group(0) @binding(20) var<storage,read_write> particlesOut: array<Particle>;
 @group(0) @binding(21) var<uniform> time: f32;
 @group(0) @binding(22) var<uniform> weather: f32;
+@group(0) @binding(23) var<uniform> box: Box;
+@group(0) @binding(24) var skyBoxTexture: texture_2d<f32>;
 
+/////////////////////////////////////
 
-// @group(0) @binding(4) var<uniform> toggleModel: f32;
+// a helper function to get the hit point of a ray to a quad
+fn quadRayHitCheck(s: vec3f, d: vec3f, q: Quad, ct: f32) -> vec2f {
+  // Note, the quad is axis aligned
+  // we assume the ray is transfomred using the poses to the model coordiantes
+  // Step 1: Construct the ray as a line in PGA
+  let L = createLine(s, d);
+  // Step 2: Construct the plane in PGA
+  let P = createPlaneFromPoints(q.ll.xyz, q.lr.xyz, q.ur.xyz); // we only need three points to define a plane
+  // Step 3: Compute the intersection info
+  var hitInfo = linePlaneIntersection(L, P);
+  if (hitInfo.hit) {
+    // Step 4: Check if the hit point within the face
+    if (abs(q.ll.z - q.ur.z) <= EPSILON) { // z is 0, i.e. front or back face
+      hitInfo.hit = (q.ll.x <= hitInfo.p.x && hitInfo.p.x <= q.ur.x) && (q.ll.y <= hitInfo.p.y && hitInfo.p.y <= q.ur.y);
+    }
+    else if (abs(q.ll.y - q.ur.y) <= EPSILON) { // y is 0, i.e. top or down face
+      hitInfo.hit = (q.ll.x <= hitInfo.p.x && hitInfo.p.x <= q.ur.x) && (q.ll.z <= hitInfo.p.z && hitInfo.p.z <= q.ur.z);
+    }
+    else if (abs(q.ll.x - q.ur.x) <= EPSILON) { // x is 0, i.e. left or right face
+      hitInfo.hit = (q.ll.y <= hitInfo.p.y && hitInfo.p.y <= q.ur.y) && (q.ll.z <= hitInfo.p.z && hitInfo.p.z <= q.ur.z);
+    }
+    // Step 5: Compute the new hit (t) value i.e. hitPt = s + t * d
+    if (hitInfo.hit) {
+      var nt: f32 = -1.;
+      // pick one axis to compute the t value
+      if (d.x > EPSILON) {
+        nt = (hitInfo.p.x - s.x) / d.x;
+      }
+      else if (d.y > EPSILON) {
+        nt = (hitInfo.p.y - s.y) / d.y;
+      }
+      else {
+        nt = (hitInfo.p.z - s.z) / d.z;
+      }
+      // return the hit cases
+      if (nt < 0) {
+        return vec2f(ct, -1); // Case 1: the ray has already passed the face, no hit
+      }
+      else if (ct < 0) {
+        return vec2f(nt, 1.); // Case 2: the first hit is nt, and say it hits the new face
+      }
+      else {
+        if (nt < ct) {
+          return vec2f(nt, 1.); // Case 3: the closer is nt, and say it hits the new face first
+        }
+        else {
+          return vec2f(ct, -1.); // Case 4: the closer is ct, and say it hits the old face first
+        }
+      }
+    }
+  }
+  return vec2f(ct, -1.); // Default Case: no hit
+}
 
+// a function to transform the direction to the model coordiantes
+fn transformBoxDir(d: vec3f, cameraID: u32) -> vec3f {
+  // transform the direction using the camera pose
+  var out = applyMotorToDir(d, cameraPoseIn[cameraID].motor);
+  // transform it using the object pose
+  out = applyMotorToDir(out, reverse(box.motor));
+  out /= box.scale.xyz;
+  return out;
+}
+
+// a function to transform the start pt to the model coordiantes
+fn transformBoxPt(pt: vec3f, cameraID: u32) -> vec3f {
+  // transform the point using the camera pose
+  var out = applyMotorToPoint(pt, cameraPoseIn[cameraID].motor);  // transform it using the object pose
+  out = applyMotorToPoint(out, reverse(box.motor));
+  out /= box.scale.xyz;
+  return out;
+}
+
+// a function to transform normal to the world coordiantes
+fn transformBoxNormal(n: vec3f) -> vec3f {
+  var out = n * box.scale.xyz;
+  out = applyMotorToDir(out, box.motor);
+  return normalize(out);
+}
+
+// a function to transform hit point to the world coordiantes
+fn transformBoxHitPoint(pt: vec3f) -> vec3f {
+  var out = pt * box.scale.xyz;
+  out = applyMotorToPoint(out, box.motor);
+  return out;
+}
+
+// a function to compute the ray box intersection
+fn rayBoxIntersection(s: vec3f, d: vec3f) -> vec2f { // output is (t, idx)
+  // t is the hit value, idx is the fact it hits
+  // here we have six planes to check and we keep the cloest hit point
+  var t = -1.;
+  var idx = -1.;
+  for (var i = 0; i < 6; i++) {
+    let info = quadRayHitCheck(s, d, box.faces[i], t);
+    if (info.y > 0) {
+      t = info.x;
+      idx = f32(i);
+    }
+  }
+  return vec2f(t, idx);
+}
+
+/////////////////////////////////////
 // a function to transform the direction to the model coordiantes
 fn transformDir(d: vec3f, cameraId: u32) -> vec3f {
   // transform the direction using the camera pose
@@ -426,7 +531,7 @@ fn getNextHitValue(startT: f32, curT: vec2f, checkval: f32, minCorner: vec2f, ma
   }
   return cur;
 }
- 
+
 fn faceMapping(viewDir: vec3f)-> i32{
   // idea: use dot product to find which face normal is the most parallel to the current (negative) ray direction [callled it viewDir]
   var mostParallelFace = -1; // Unknown face
@@ -549,11 +654,7 @@ fn textureMapping(face: i32, hitPoint: vec3f, terrainType: i32) -> vec4f {
                     color = textureSampleLevel(snowyTopTexture, inSampler, hitPoint.zy, 0);
                     break;
                 }
-                case 4: {
-                    color = textureSampleLevel(snowyTopTexture, inSampler, hitPoint.xz, 0);
-                    break;
-                }
-                case 5: {
+                case 4,5: {
                     color = textureSampleLevel(snowyTopTexture, inSampler, hitPoint.xz, 0);
                     break;
                 }
@@ -616,7 +717,56 @@ fn transformNormal(n: vec3f) -> vec3f {
   return normalize(out);
 }
 
-fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
+/////////////////////
+fn boxDiffuseColor(idx: i32, hitPoint: vec3f) -> vec4f {
+  // my box has different colors for each foace
+  var color: vec4f;
+    switch(idx) {
+      case 0: { //front
+        let textDim=vec2f(textureDimensions(skyBoxTexture,0));
+        // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
+        color=textureLoad(skyBoxTexture, vec2i((hitPoint.xy-vec2f(-0.5*box.scale.xy))/box.scale.xy*textDim),0);
+        break;
+      }
+      case 1: { //back
+        let textDim=vec2f(textureDimensions(skyBoxTexture,0));
+        // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
+        color=textureLoad(skyBoxTexture, vec2i((hitPoint.xy-vec2f(-0.5*box.scale.xy))/box.scale.xy*textDim),0);
+        break;
+      }
+      case 2: { //left
+        let textDim=vec2f(textureDimensions(skyBoxTexture,0));
+        // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
+        color=textureLoad(skyBoxTexture, vec2i((hitPoint.yz-vec2f(-0.5*box.scale.yz))/box.scale.yz*textDim),0);
+        break;
+      }
+      case 3: { //right
+        let textDim=vec2f(textureDimensions(skyBoxTexture,0));
+        // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
+        color=textureLoad(skyBoxTexture, vec2i((hitPoint.yz-vec2f(-0.5*box.scale.yz))/box.scale.yz*textDim),0);
+        break;
+      }
+      case 4: { //top
+        let textDim=vec2f(textureDimensions(skyBoxTexture,0));
+        // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
+        color=textureLoad(skyBoxTexture, vec2i((hitPoint.xz-vec2f(-0.5*box.scale.xz))/box.scale.xz*textDim),0);
+        break;
+      }
+      case 5: { //down
+        let textDim=vec2f(textureDimensions(skyBoxTexture,0));
+        // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
+        color=textureLoad(skyBoxTexture, vec2i((hitPoint.xz-vec2f(-0.5*box.scale.xz))/box.scale.xz*textDim),0);
+        break;
+      }
+      default: {
+        color = vec4f(0.f/255, 255.f/255, 0.f/255, 1.); // Black
+        break;
+      }
+    }
+    return color;
+  }
+/////////////////////
+fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f,pBox: vec3f, dBox: vec3f, cameraId: u32) {
   // find camera directions
   var forward = transformDir(vec3f(0, 0, 1), cameraId); // forward
   var right = transformDir(vec3f(1, 0, 0), cameraId); // right
@@ -636,9 +786,10 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
 
   let halfSize: vec3f = volInfo.dims.xyz * volInfo.sizes.xyz * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z);
   let voxelSize: vec3f = vec3f(1,1,1) * volInfo.sizes.xyz / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z); // normalized voxel size
-
-
-  var color = vec4f(0.f/255, 70.f/255, 140.f/255, 1.); // Bucknell Blue
+  var currHitInfo = rayBoxIntersection(pBox,dBox); ///
+  var hitPt = pBox + dBox * currHitInfo.x;
+  hitPt = transformBoxHitPoint(hitPt);
+  var color = boxDiffuseColor(i32(currHitInfo.y), hitPt); // get the box diffuse property
   var prevPos: vec3f;
 
   while (curHit.x < hits.y) {
@@ -656,7 +807,6 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
       // TODO: instead of setting, now it should be blending 
       var currFace=faceMapping(vPos-prevPos);
       //color = textureMapping(currFace, curPt);
-      
       
       if (i32(volData[vIdx].terrainType) != 0) {
         var currFace=i32(curHit.y);//faceMapping(-d);
@@ -687,6 +837,20 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
         // var hitPt = spt + rdir * hitInfo.x;
         curPt = transformHitPoint(curPt);
         var diffuse = color; // get the box diffuse property
+// ////////////////////////////////////////////////////
+//         var startSpt = vec3f(0, 0, 0);
+//         var startRDir = normalize(vec3f((f32(uv.x) + 0.5) * psize.x - cameraPoseIn[cameraId].focal.x, (f32(uv.y) + 0.5) * psize.y - cameraPoseIn[cameraId].focal.y, 1));
+
+//         var spt = transformBoxPt(startSpt, cameraId); ///
+//         var rdir = transformBoxDir(startRDir,cameraId); ///
+//         // compute the intersection to the object
+//         var currHitInfo = rayBoxIntersection(currSpt, currRDir); ///
+
+//         var hitPt = spt + rdir * hitInfo.x;
+//         hitPt = transformBoxHitPoint(hitPt);
+//         // var diffuse = boxDiffuseColor(i32(hitInfo.y), hitPt,goodBox); // get the box diffuse property
+//         var diffuse = vec4f(217.f/255, 217.f/255, 214.f/255, 1.);
+// ////////////////////////////////////////////////////
         //   2. get the box normal
         var normal = normalize(-vPos+prevPos);
         //   3. transform the normal to the world coordinates
@@ -880,10 +1044,13 @@ fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u, @built
     var spt = vec3f(0, 0, 0);
     var rdir = vec3f((f32(uv.x) + 0.5) * psize.x - cameraPoseIn[cameraId].focal.x, (f32(uv.y) + 0.5) * psize.y - cameraPoseIn[cameraId].focal.y, 1);
     // apply transformation
+    var sptBox = transformBoxPt(spt, cameraId);
+    var rdirBox = transformBoxDir(rdir, cameraId);
+
     spt = transformPt(spt, cameraId);
     rdir = transformDir(rdir, cameraId);
 
-    traceTerrain(uv, spt, rdir, cameraId);
+    traceTerrain(uv, spt, rdir, sptBox, rdirBox, cameraId);
 
     cameraPoseOut[cameraId] = cameraPoseIn[cameraId];
     // TODO: Fix raycasts not working

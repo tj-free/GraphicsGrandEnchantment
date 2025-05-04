@@ -58,7 +58,7 @@ async function init() {
   // Create a 3D Camera
   // Create an object to trace
   var blockTextures= ["./assets/textures/blocks/azalea_leaves.png", "./assets/textures/blocks/dirt.png","./assets/textures/blocks/grass_carried.png", "./assets/textures/blocks/grass_side_carried.png", "./assets/textures/blocks/grass_side_snowed.png", "./assets/textures/blocks/log_oak_top.png","./assets/textures/blocks/log_oak.png","./assets/textures/blocks/snow.png","./assets/textures/blocks/stone.png"]
-  var particleTextures=["./assets/textures/particles/pale_oak_leaves_atlas.png","./assets/textures/particles/particles.png"]
+  var particleTextures=["./assets/textures/particles/pale_oak_leaves_atlas.png","./assets/textures/particles/particles.png","./assets/textures/Lycksele/posy.jpg"]
 
   var tracerObj= new VolumeRenderingSimpleObject(tracer._device, tracer._canvasFormat,
   [leftCamera, rightCamera], true, blockTextures.concat(particleTextures));

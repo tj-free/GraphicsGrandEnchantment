@@ -318,6 +318,7 @@ struct LightInfo {
 
 
 
+
 // @group(0) @binding(4) var<uniform> toggleModel: f32;
 
 // a function to transform the direction to the model coordiantes
