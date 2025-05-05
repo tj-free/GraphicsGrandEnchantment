@@ -280,9 +280,10 @@ async function init() {
 
     
   
-    document.addEventListener("updateCameraPose", (e) => {
-      console.log(e.detail.pose.length)
+    document.addEventListener("updateCameraPose", async (e) => {
+      //console.log(e.detail.pose.slice(0,16))
       if (e.detail.pose.length == 48) {
+        //leftCamera.moveY(0.02);
         leftCamera._pose.set(e.detail.pose.slice(0,16));
         rightCamera._pose.set(e.detail.pose.slice(16));
         tracerObj.updateCameraPose();
