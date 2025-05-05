@@ -509,12 +509,10 @@ fn rayVolumeIntersection(p: vec3f, d: vec3f) -> vec3f {
   let halfsize = volInfo.dims * volInfo.sizes * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z); // 1mm
   hitValues = getVolumeHitValues(halfsize.z, halfsize.xy, p.z, d.z, p.xy, d.xy, hitValues, 1); // z = halfsize.z Back
   hitValues = getVolumeHitValues(-halfsize.z, halfsize.xy, p.z, d.z, p.xy, d.xy, hitValues, 0); // z = -halfsize.z Front
-  hitValues = getVolumeHitValues(halfsize.z, halfsize.xy, p.z, d.z, p.xy, d.xy, hitValues, 1); // z = halfsize.z Back
   hitValues = getVolumeHitValues(-halfsize.x, halfsize.yz, p.x, d.x, p.yz, d.yz, hitValues, 2); // x = -halfsize.x Left
   hitValues = getVolumeHitValues(halfsize.x, halfsize.yz, p.x, d.x, p.yz, d.yz, hitValues, 3); // x = halfsize.x Right
   hitValues = getVolumeHitValues(halfsize.y, halfsize.xz, p.y, d.y, p.xz, d.xz, hitValues, 5); // y = halfsize.y Bottom
   hitValues = getVolumeHitValues(-halfsize.y, halfsize.xz, p.y, d.y, p.xz, d.xz, hitValues, 4); // y = -halfsize.y Top 
-  hitValues = getVolumeHitValues(halfsize.y, halfsize.xz, p.y, d.y, p.xz, d.xz, hitValues, 5); // y = halfsize.y Bottom
   return hitValues;
 }
 
