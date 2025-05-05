@@ -1012,7 +1012,7 @@ fn updateParticle(@builtin(global_invocation_id) global_id: vec3u) {
     let terrain = volData[vIdx].terrainType;
     if (i32(terrain) != 0) {
       // if it is non-air type, destroy the particle/respawn it
-      particlesOut[idx].p.y = 1.0; //particlesIn[idx].pInit.y;
+      particlesOut[idx].p.y = particlesIn[idx].pInit.y;
     } else {
       // Otherwise, set it to the cell
       // increase the number of particles in the cell
