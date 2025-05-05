@@ -343,6 +343,7 @@ struct LightInfo {
 @group(0) @binding(25) var skyUp: texture_2d<f32>;
 @group(0) @binding(26) var skyDown: texture_2d<f32>;
 
+
 /////////////////////////////////////
 
 // a helper function to get the hit point of a ray to a quad
@@ -903,11 +904,9 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f,pBox: vec3f, dBox: vec3f, cameraId
               if ( ((abs(uv.x)) < size/2) && (abs(uv.y) < size/2) ) {
                 if (weather==1){  //rain, blue
                   color = vec4f(0.,0.,1.,1.);
-
                 }   
                 else{
                   color = vec4f(1.,1.,1.,1.);
-
                 }
 
                 //TODO: check weather here to adjust the color for particles
@@ -1068,18 +1067,10 @@ fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u, @built
 
     cameraPoseOut[cameraId] = cameraPoseIn[cameraId];
     // TODO: Fix raycasts not working
-<<<<<<< HEAD
-    // if (!raytrace(spt, vec3f(0, 1, 0), 0.1)) {
-    //   let dt = createTranslator(vec3f(0, 0.01, 0));
-    //   let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
-    //   cameraPoseOut[cameraId].motor = newpose;
-    // }
-=======
     if (!raytrace(spt, vec3f(0, 1, 0), 0.1)) {
       let dt = createTranslator(vec3f(0, 0.01, 0));
       let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
       // cameraPoseOut[cameraId].motor = newpose;
     }
->>>>>>> vrControls2
   }
 }
