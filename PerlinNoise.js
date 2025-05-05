@@ -38,6 +38,7 @@ import MassParticleSystem from './lib/DSViz/MassParticleSystem.js'
 import Renderer from './lib/Viz/2DRenderer.js'
 import ParticleSystemObject from './lib/DSViz/ParticleSystemObject.js'
 import DirectionalLight from './lib/Viz/DirectionalLight.js'
+import PGA3D from './lib/Math/PGA3D.js'
 
 
 async function init() {
@@ -70,7 +71,7 @@ async function init() {
   await tracer.setTracerObject(tracerObj);
 
   // leftCamera.moveZ(-2);
-  leftCamera.moveY(-1);
+  leftCamera.moveY(-.5);
   // leftCamera.moveZ(-5);
   // NOTE: cameras need to be rotated?
   // How do humans see
@@ -78,7 +79,7 @@ async function init() {
   leftCamera.moveX(-0.000);
   // leftCamera.rotateY(5);
   // rightCamera.moveZ(-2);
-  rightCamera.moveY(-1);
+  rightCamera.moveY(-.5);
   // rightCamera.moveX(-0.0298200368);
   rightCamera.moveX(.1);
   rightCamera.rotateY(-5);
@@ -93,123 +94,55 @@ async function init() {
   let fps = '??';
   var fpsText = new StandardTextObject('VR FPS: ' + 100 + '\n' + 'FPS: ' + 100);
   fpsText._textCanvas.style.left="1000px";
-  const infoText = new StandardTextObject('WS: Move in Z\n' +
-                                          'AD: Move in X\n' +
-                                          'Space/Shift: Move in Y\n' +
-                                          'QE: Rotate in Z\n' +
-                                          'Up/Down: Rotate in X\n' +
-                                          'Left/Right: Rotate in Y\n' +
-                                          'T: Change Camera Mode\n' +
-                                          '-=: Change Camera Focal X\n' +
-                                          '[]: Change Camera Focal Y\n'+
-                                          'U: Toggle Camera/Object\n'+
-                                          'B: Toggle Models\n'+
-                                          '1: Toggle Weather');
-  var movespeed = 0.05;
-  var rotatespeed = 2;
-  var focalXSpeed = 0.1;
-  var focalYSpeed = 0.1;
+  const infoText = new StandardTextObject('WS: Move Forward\n' +
+                                          'AD: Move Left/Right\n' +
+                                          'Space: Jump\n' +
+                                          'Mouse: Look Around\n' +
+                                          '1: Toggle Weather\n' +
+                                          '2: Break Block\n' +
+                                          '3: Place Block');
+  var movespeed = 0.005;
+  var jumpspeed = 0.03;
+
+  var moveX = 0;
+  var moveY = 0;
+  var moveZ = 0;
+
   document.addEventListener('keydown', async (e) => {
     switch (e.key) {
       case 'g':
         tracer.switchCamera(0)
-        tracerObj.updateCameraPose();
         break;
       case 'h':
         tracer.switchCamera(1)
-        tracerObj.updateCameraPose();
         break;
       case 'w': case 'W':
-        leftCamera.moveZ(movespeed);
-        rightCamera.moveZ(movespeed);
-        tracerObj.updateCameraPose();
+        moveZ += movespeed;
         break;
       case 'a': case 'A':
-        leftCamera.moveX(-movespeed);
-        rightCamera.moveX(-movespeed);
-        tracerObj.updateCameraPose();
+        moveX -= movespeed;
         break;
       case 's': case 'S':
-        leftCamera.moveZ(-movespeed);
-        rightCamera.moveZ(-movespeed);
-        tracerObj.updateCameraPose();
+        moveZ -= movespeed;
         break;
       case 'd': case 'D':
-        leftCamera.moveX(movespeed);
-        rightCamera.moveX(movespeed);
-        tracerObj.updateCameraPose();
+        moveX += movespeed;
         break;
       case ' ':
-        leftCamera.moveY(-movespeed);
-        rightCamera.moveY(-movespeed);
-        tracerObj.updateCameraPose();
+        moveY -= jumpspeed;
         break;
-      case 'Shift':
-        leftCamera.moveY(movespeed);
-        rightCamera.moveY(movespeed);
-        tracerObj.updateCameraPose();
-        break;
-      case 'q': case 'Q':
-        leftCamera.rotateZ(rotatespeed);
-        rightCamera.rotateZ(rotatespeed);
-        tracerObj.updateCameraPose();
-        break;
-      case 'e': case'E':
-        leftCamera.rotateZ(-rotatespeed);
-        rightCamera.rotateZ(-rotatespeed);
-        tracerObj.updateCameraPose();
-        break;
-      case 'ArrowUp':
-        leftCamera.rotateX(-rotatespeed);
-        rightCamera.rotateX(-rotatespeed);
-        tracerObj.updateCameraPose();
-        break;
-      case 'ArrowLeft':
-        leftCamera.rotateY(rotatespeed);
-        rightCamera.rotateY(rotatespeed);
-        tracerObj.updateCameraPose();
-        break;
-      case 'ArrowDown':
-        leftCamera.rotateX(rotatespeed);
-        rightCamera.rotateX(rotatespeed);
-        tracerObj.updateCameraPose();
-        break;
-      case 'ArrowRight':
-        leftCamera.rotateY(-rotatespeed);
-        rightCamera.rotateY(-rotatespeed);
-        tracerObj.updateCameraPose();
-        break;
-      case '-':
-        leftCamera.changeFocalX(focalXSpeed);
-        rightCamera.changeFocalX(focalXSpeed);
-        tracerObj.updateCameraFocal();
-        break;
-      case '=':
-        leftCamera.changeFocalX(-focalXSpeed);
-        rightCamera.changeFocalX(-focalXSpeed);
-        tracerObj.updateCameraFocal();
-        break;
-      case '[':
-        leftCamera.changeFocalY(focalYSpeed);
-        rightCamera.changeFocalY(focalYSpeed);
-        tracerObj.updateCameraFocal();
-        break;
-      case ']':
-        leftCamera.changeFocalY(-focalYSpeed);
-        rightCamera.changeFocalY(-focalYSpeed);
-        tracerObj.updateCameraFocal();
-        break;
-      case "u": case "U":
-       toggleMovement= !toggleMovement;
-       break;
       case "1": 
-        // tracerObj.iterateWeatherLight(directionalLight, weatherLightValues, currWeather);
-        // currWeather = (currWeather + 1) %3; // cycle through values
         Input.getWeather(tracerObj, directionalLight);
         tracerObj.updateLight(directionalLight);
 
         tracerObj.cycleWeather()
-        console.log(tracerObj._weather)
+        //console.log(tracerObj._weather)
+        break;
+      case "2": 
+        await tracerObj.breakBlock();
+        break;
+      case "3": 
+        await tracerObj.placeBlock();
         break;
 
   }
@@ -218,25 +151,18 @@ async function init() {
 
 
 
+  var rotX = 0;
+  var rotY = 0;
  
     // Rotate camera horizontally (Y-axis) and vertically (X-axis)
     document.addEventListener("mousemove", (event) => {
-      //console.log("Mouse moved X:", event.movementX);
-      //console.log("Mouse moved Y:", event.movementY);
       canvasTag.requestPointerLock();
 
       let dir = Math.atan(event.movementY / event.movementX);
       let moved = Input.getMouseMovement()
       const sensitivity = 0.05; // tune this based on feel
-      leftCamera.rotateY(-event.movementX * sensitivity);
-      rightCamera.rotateY(-event.movementX * sensitivity);
-
-      leftCamera.rotateX(event.movementY * sensitivity);
-      rightCamera.rotateX(event.movementY * sensitivity);
-
-
-    tracerObj.updateCameraPose(); // your own method to sync visuals
-    
+      rotY -= event.movementX * sensitivity;
+      rotX += event.movementY * sensitivity;
     });
 
     //Weather Event Listener
@@ -250,45 +176,63 @@ async function init() {
       tracerObj.cycleWeather();
     });
 
+
+
     //break Event Listener
     document.addEventListener('breakEvent', (button) => {
-      console.log("break event recieved")
+      //console.log("break event recieved")
      //TODO: call break function here
      
     });
 
     //jump Event Listener
     document.addEventListener('jumpEvent', (button) => {
-      console.log("jump event recieved");
-      leftCamera.moveY(-movespeed);
-      rightCamera.moveY(-movespeed);
-      tracerObj.updateCameraPose();
+      moveY += -jumpspeed
     });
 
     document.addEventListener('moveJoystick', (event) => {
       const { a, b } = event.detail;
-      leftCamera.moveX(b*0.005); //left/right
-      leftCamera.moveZ(a*0.0025); //up/down
-      rightCamera.moveX(b*0.005);
-      rightCamera.moveZ(a*0.0025); 
-      tracerObj.updateCameraPose();
+      moveX +=b*0.005
+      moveZ += a*0.0025
     });
 
     document.addEventListener('rotateJoystick', (event) => {
       const { a, b } = event.detail;
-      leftCamera.rotateY(-b*0.5);
-      leftCamera.rotateX(-a*0.5);
-      rightCamera.rotateY(-b*0.5);
-      rightCamera.rotateX(-a*0.5);
-      tracerObj.updateCameraPose();
+      rotX += -a*0.5
+      rotY += -b*0.5
     });
 
     
   
+    document.addEventListener("updateCameraPose", (e) => {
+      if (e.detail.pose.length == 48) {
+        //leftCamera.moveY(0.02);
+        leftCamera._pose.set(e.detail.pose.slice(0,16));
+        leftCamera.moveX(moveX);
+        leftCamera.moveY(moveY);
+        leftCamera.moveZ(moveZ);
+        leftCamera.rotateX(rotX);
+        leftCamera.rotateY(rotY);
+        rightCamera._pose.set(e.detail.pose.slice(20, 36));
+        rightCamera.moveX(moveX);
+        rightCamera.moveY(moveY);
+        rightCamera.moveZ(moveZ);
+        rightCamera.rotateX(rotX);
+        rightCamera.rotateY(rotY);
+        tracerObj.updateCameraPose();
+        
+        moveX = 0;
+        moveY = 0;
+        moveZ = 0;
+        rotX = 0;
+        rotY = 0;
+      }
+    })
 
+  setInterval(async () => {
+    tracerObj.getRaycastChecks();
+  }, 10)
 
-   
-  
   // Update FPS text
   setInterval(() => {
     fpsText.updateText('VR FPS: ' + tracer._VRFps + '\n' + 'FPS: ' + tracer._fps);
@@ -296,14 +240,10 @@ async function init() {
   return tracer;
 }
 init().then( ret => {
-  console.log(ret);
+  //console.log(ret);
 }).catch( error => {
   const pTag = document.createElement('p');
   pTag.innerHTML = navigator.userAgent + "</br>" + error.message;
   document.body.appendChild(pTag);
   document.getElementById("renderCanvas").remove();
 });
-
-
-
-

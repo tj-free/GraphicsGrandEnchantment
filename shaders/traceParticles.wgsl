@@ -335,13 +335,15 @@ struct LightInfo {
 @group(0) @binding(17) var<storage,read_write> particlesOut: array<Particle>;
 @group(0) @binding(18) var<uniform> time: f32;
 @group(0) @binding(19) var<uniform> weather: f32;
-@group(0) @binding(20) var<uniform> box: Box;
-@group(0) @binding(21) var skyFront: texture_2d<f32>;
-@group(0) @binding(22) var skyBack: texture_2d<f32>;
-@group(0) @binding(23) var skyLeft: texture_2d<f32>;
-@group(0) @binding(24) var skyRight: texture_2d<f32>;
-@group(0) @binding(25) var skyUp: texture_2d<f32>;
-@group(0) @binding(26) var skyDown: texture_2d<f32>;
+@group(0) @binding(20) var<uniform> breakBlock: f32;
+@group(0) @binding(21) var<uniform> box: Box;
+@group(0) @binding(22) var skyFront: texture_2d<f32>;
+@group(0) @binding(23) var skyBack: texture_2d<f32>;
+@group(0) @binding(24) var skyLeft: texture_2d<f32>;
+@group(0) @binding(25) var skyRight: texture_2d<f32>;
+@group(0) @binding(26) var skyUp: texture_2d<f32>;
+@group(0) @binding(27) var skyDown: texture_2d<f32>;
+
 
 
 /////////////////////////////////////
@@ -885,7 +887,16 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f,pBox: vec3f, dBox: vec3f, cameraId
 
         // set the color to the particle color and break the loop
         //render particles based on weather
-
+          // if it is the air, we need to update the hit point, right?
+            // If we don't hit anything
+        minCorner = minCorner * voxelSize - halfSize;
+        maxCorner = minCorner + voxelSize;
+        curHit = getNextHitValue(hits.x, curHit, minCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy, 0); // xy
+        curHit = getNextHitValue(hits.x, curHit, maxCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy, 1);
+        curHit = getNextHitValue(hits.x, curHit, minCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz, 2); // yz
+        curHit = getNextHitValue(hits.x, curHit, maxCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz, 3);
+        curHit = getNextHitValue(hits.x, curHit, minCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz, 5); // xz
+        curHit = getNextHitValue(hits.x, curHit, maxCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz, 4);
 
         if (weather != 0){
 
@@ -923,17 +934,6 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f,pBox: vec3f, dBox: vec3f, cameraId
           if (isHit == 1) { // no need to march if it hits a particle
             break;
           }
-        
-          // if it is the air, we need to update the hit point, right?
-            // If we don't hit anything
-          minCorner = minCorner * voxelSize - halfSize;
-          maxCorner = minCorner + voxelSize;
-          curHit = getNextHitValue(hits.x, curHit, minCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy, 0); // xy
-          curHit = getNextHitValue(hits.x, curHit, maxCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy, 1);
-          curHit = getNextHitValue(hits.x, curHit, minCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz, 2); // yz
-          curHit = getNextHitValue(hits.x, curHit, maxCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz, 3);
-          curHit = getNextHitValue(hits.x, curHit, minCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz, 5); // xz
-          curHit = getNextHitValue(hits.x, curHit, maxCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz, 4);
         }
       }
       // hit five times q, then five times w, then five times d to see the terrain
@@ -950,11 +950,11 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f,pBox: vec3f, dBox: vec3f, cameraId
   }
 }
 
-fn raytrace(p: vec3f, d: vec3f, length: f32) -> bool {
+fn raytrace(p: vec3f, d: vec3f, length: f32, hit: bool) -> f32 {
   // find the start and end point
   var hits = rayVolumeIntersection(p, d);
 
-  var curHit = vec2f(hits.x + 0.02, hits.z);
+  var curHit = vec2f(0, hits.z);
 
   let halfSize: vec3f = volInfo.dims.xyz * volInfo.sizes.xyz * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z);
   let voxelSize: vec3f = vec3f(1,1,1) * volInfo.sizes.xyz / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z); // normalized voxel size
@@ -969,8 +969,15 @@ fn raytrace(p: vec3f, d: vec3f, length: f32) -> bool {
       let vIdx: i32 = i32(vPos.z) * i32(volInfo.dims.x * volInfo.dims.y)
                       + i32(vPos.y) * i32(volInfo.dims.x)
                       + i32(vPos.x);
-      if (i32(volData[vIdx].terrainType) != 0) {
-           return true;
+      if (hit) {
+        if (i32(volData[vIdx].terrainType) != 0) {
+          return curHit.x;
+        }
+      }
+      else {
+        if (i32(volData[vIdx].terrainType) == 0) {
+          return curHit.x;
+        }
       }
     }
     // If we don't hit anything
@@ -984,7 +991,7 @@ fn raytrace(p: vec3f, d: vec3f, length: f32) -> bool {
     }
     curHit.x += 0.002;
   }
-  return false;
+  return -1;
 }
 
 
@@ -1049,6 +1056,163 @@ fn updateParticle(@builtin(global_invocation_id) global_id: vec3u) {
   }
 }
 
+fn checkBlock(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
+
+  // find the start and end point
+  var hits = rayVolumeIntersection(p, d);
+  var delta = 0.001;
+  var maxLength = 0.075;
+
+  if (hits.y < 0) {
+    hits.y = hits.x;
+    hits.x = 0;
+  }
+
+  var curHit = vec2f(0, hits.z);
+
+  let halfSize: vec3f = volInfo.dims.xyz * volInfo.sizes.xyz * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z);
+  let voxelSize: vec3f = vec3f(1,1,1) * volInfo.sizes.xyz / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z); // normalized voxel size
+
+  while (curHit.x < maxLength) {
+    var curPt: vec3f = p + d * curHit.x + halfSize;
+    let vPos = curPt / (voxelSize);
+    var minCorner = floor(vPos);
+    // var maxCorner = ceil(vPos);
+    var maxCorner = minCorner + vec3f(1, 1, 1);
+
+    if (all(vPos >= vec3f(0)) && all(vPos < volInfo.dims.xyz)) {
+      let vIdx: i32 = i32(vPos.z) * i32(volInfo.dims.x * volInfo.dims.y)
+                      + i32(vPos.y) * i32(volInfo.dims.x)
+                      + i32(vPos.x);
+      
+      if ( (i32(volData[vIdx].terrainType) != 0) ) {
+        if (breakBlock > 0.0) {
+          volData[vIdx].terrainType = 0;
+          break;
+        }
+      } else {
+      curHit = getNextHitValue(hits.x, curHit, minCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy, 1); // xy
+      curHit = getNextHitValue(hits.x, curHit, maxCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy, 0);
+      curHit = getNextHitValue(hits.x, curHit, minCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz, 2); // yz
+      curHit = getNextHitValue(hits.x, curHit, maxCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz, 3);
+      curHit = getNextHitValue(hits.x, curHit, minCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz, 5); // xz
+      curHit = getNextHitValue(hits.x, curHit, maxCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz, 4);
+      }
+    }
+    curHit.x += delta;
+  }
+}
+
+fn checkPlace(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
+
+  // find the start and end point
+  var hits = rayVolumeIntersection(p, d);
+  var delta = 0.001;
+  var maxLength = 0.075;
+  var minLength = 0.005;
+  var prevPos: vec3f;
+
+  if (hits.y < 0) {
+    hits.y = hits.x;
+    hits.x = 0;
+  }
+
+  var curHit = vec2f(0, hits.z);
+
+  let halfSize: vec3f = volInfo.dims.xyz * volInfo.sizes.xyz * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z);
+  let voxelSize: vec3f = vec3f(1,1,1) * volInfo.sizes.xyz / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z); // normalized voxel size
+
+  while ( (curHit.x < maxLength)  ) {
+    var curPt: vec3f = p + d * curHit.x + halfSize;
+    let vPos = curPt / (voxelSize);
+    var minCorner = floor(vPos);
+    // var maxCorner = ceil(vPos);
+    var maxCorner = minCorner + vec3f(1, 1, 1);
+
+    if (all(vPos >= vec3f(0)) && all(vPos < volInfo.dims.xyz)) {
+      let vIdx: i32 = i32(vPos.z) * i32(volInfo.dims.x * volInfo.dims.y)
+                      + i32(vPos.y) * i32(volInfo.dims.x)
+                      + i32(vPos.x);
+      
+      if ( (i32(volData[vIdx].terrainType) != 0) ) {
+
+        let vpIdx: i32 = i32(prevPos.z) * i32(volInfo.dims.x * volInfo.dims.y)
+                    + i32(prevPos.y) * i32(volInfo.dims.x)
+                    + i32(prevPos.x);
+        volData[vpIdx].terrainType = i32(volInfo.dims.y * 0.25);
+        break;
+        
+      } else {
+        curHit = getNextHitValue(hits.x, curHit, minCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy, 1); // xy
+        curHit = getNextHitValue(hits.x, curHit, maxCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy, 0);
+        curHit = getNextHitValue(hits.x, curHit, minCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz, 2); // yz
+        curHit = getNextHitValue(hits.x, curHit, maxCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz, 3);
+        curHit = getNextHitValue(hits.x, curHit, minCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz, 5); // xz
+        curHit = getNextHitValue(hits.x, curHit, maxCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz, 4);
+        prevPos = vPos;
+      }
+    }
+    prevPos = vPos;
+    curHit.x += delta;
+  }
+}
+
+@compute
+@workgroup_size(1)
+fn breakBlocks(@builtin(global_invocation_id) global_id: vec3u, @builtin(workgroup_id) workgroup_id: vec3u)  {
+  let cameraId = workgroup_id.z;
+  // get the pixel coordiantes
+  let uv = vec2i(global_id.xy);
+  var texDim: vec2i;
+  if (cameraId == 0) {
+    texDim = vec2i(textureDimensions(outTextureLeft));
+  }
+  else {
+    texDim = vec2i(textureDimensions(outTextureRight));
+  }
+
+  if (uv.x < texDim.x && uv.y < texDim.y) {
+    // compute the pixel size
+    let psize = vec2f(2, 2) / cameraPoseIn[cameraId].res.xy * cameraPoseIn[cameraId].focal.xy;
+    // orthogonal camera ray sent from each pixel center at z = 0
+    var spt = vec3f(0, 0, 0);
+    var rdir = vec3f(0, 0, 1);
+
+    spt = transformPt(spt, cameraId);
+    rdir = transformDir(rdir,cameraId);
+
+    checkBlock(uv, spt, rdir, cameraId);
+  }
+}
+
+@compute
+@workgroup_size(1)
+fn placeBlocks(@builtin(global_invocation_id) global_id: vec3u, @builtin(workgroup_id) workgroup_id: vec3u)  {
+  let cameraId = workgroup_id.z;
+  // get the pixel coordiantes
+  let uv = vec2i(global_id.xy);
+  var texDim: vec2i;
+  if (cameraId == 0) {
+    texDim = vec2i(textureDimensions(outTextureLeft));
+  }
+  else {
+    texDim = vec2i(textureDimensions(outTextureRight));
+  }
+
+  if (uv.x < texDim.x && uv.y < texDim.y) {
+    // compute the pixel size
+    let psize = vec2f(2, 2) / cameraPoseIn[cameraId].res.xy * cameraPoseIn[cameraId].focal.xy;
+    // orthogonal camera ray sent from each pixel center at z = 0
+    var spt = vec3f(0, 0, 0);
+    var rdir = vec3f(0, 0, 1);
+
+    spt = transformPt(spt, cameraId);
+    rdir = transformDir(rdir,cameraId);
+
+    checkPlace(uv, spt, rdir, cameraId);
+  }
+}
+
 @compute
 @workgroup_size(11, 11, 2)
 fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u, @builtin(workgroup_id) workgroup_id: vec3u) {
@@ -1074,15 +1238,69 @@ fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u, @built
 
     spt = transformPt(spt, cameraId);
     rdir = transformDir(rdir, cameraId);
+    
+    var sptFoot = transformPt(spt, cameraId);
 
     traceTerrain(uv, spt, rdir, sptBox, rdirBox, cameraId);
 
     cameraPoseOut[cameraId] = cameraPoseIn[cameraId];
+    var newpose = cameraPoseIn[cameraId].motor;
     // TODO: Fix raycasts not working
-    if (!raytrace(spt, vec3f(0, 1, 0), 0.04)) {
-      let dt = createTranslator(vec3f(0, 0.005, 0));
-      let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
-      // cameraPoseOut[cameraId].motor = newpose;
+    if (raytrace(spt, vec3f(0, 1, 0), 0.015, true) < 0) {
+      let dt = createTranslator(vec3f(0, 0.002, 0));
+      newpose = geometricProduct(dt, newpose);
     }
+    
+    var minDir: vec3f;
+    var minDist: f32 = 999999;
+    var rayDir = vec3f(1, 0, 0);
+    var rayDist = raytrace(spt, rayDir, 0.5, false);
+    if (rayDist > 0) {
+      minDist = rayDist;
+      minDir = rayDir;
+    }
+    rayDir = vec3f(-1, 0, 0);
+    rayDist = raytrace(spt, rayDir, 0.5, false);
+    if (rayDist < minDist && rayDist > 0) {
+      minDist = rayDist;
+      minDir = rayDir;
+    }
+    rayDir = vec3f(0, 0, 1);
+    rayDist = raytrace(spt, rayDir, 0.5, false);
+    if (rayDist < minDist && rayDist > 0) {
+      minDist = rayDist;
+      minDir = rayDir;
+    }
+    rayDir = vec3f(0, 0, -1);
+    rayDist = raytrace(spt, rayDir, 0.5, false);
+    if (rayDist < minDist && rayDist > 0) {
+      minDist = rayDist;
+      minDir = rayDir;
+    }
+    if (minDist > 0) {
+      let dt = createTranslator(minDir * minDist);
+      newpose = geometricProduct(dt, newpose);
+    }
+    cameraPoseOut[cameraId].motor = newpose;
+    // if (rayDist <= 0.05 && rayDist > 0) {
+    //   let dt = createTranslator(vec3f(-rayDist  , 0, 0));
+    //   let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
+    //   cameraPoseOut[cameraId].motor = newpose;
+    // }
+    // if (rayDist <= 0.05 && rayDist > 0) {
+    //   let dt = createTranslator(vec3f(rayDist, 0, 0));
+    //   let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
+    //   cameraPoseOut[cameraId].motor = newpose;
+    // }
+    // if (rayDist <= 0.05 && rayDist > 0) {
+    //   let dt = createTranslator(vec3f(0, 0, -rayDist));
+    //   let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
+    //   cameraPoseOut[cameraId].motor = newpose;
+    // }
+    // if (rayDist <= 0.05 && rayDist > 0) {
+    //   let dt = createTranslator(vec3f(0, 0, rayDist));
+    //   let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
+    //   cameraPoseOut[cameraId].motor = newpose;
+    // }
   }
 }
