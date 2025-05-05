@@ -76,16 +76,18 @@ async function init() {
   // NOTE: cameras need to be rotated?
   // How do humans see
   // leftCamera.moveX(0.0298200368);
-  leftCamera.moveX(-0.000);
-  // leftCamera.rotateY(5);
+  // leftCamera.moveX(0.01);
+  // leftCamera.rotateY(-1);
   // rightCamera.moveZ(-2);
   rightCamera.moveY(-.5);
   // rightCamera.moveX(-0.0298200368);
-  rightCamera.moveX(.1);
-  rightCamera.rotateY(-5);
+  // rightCamera.moveX(-0.01);
+  // rightCamera.rotateY(1);
+
 
   var directionalLight= new DirectionalLight();
   tracerObj.updateLight(directionalLight);
+  tracerObj.updateCameraPose();
 
   
   
@@ -102,7 +104,7 @@ async function init() {
                                           '2: Break Block\n' +
                                           '3: Place Block');
   var movespeed = 0.005;
-  var jumpspeed = 0.03;
+  var jumpspeed = 0.07;
 
   var moveX = 0;
   var moveY = 0;
@@ -178,11 +180,17 @@ async function init() {
 
 
 
-    //break Event Listener
-    document.addEventListener('breakEvent', (button) => {
-      //console.log("break event recieved")
-     //TODO: call break function here
-     
+    //place Event Listener
+    document.addEventListener('placeBlockEvent', (button) => {
+      tracerObj.placeBlock();
+      console.log("break block");
+
+    });
+
+     //break Event Listener
+     document.addEventListener('breakBlockEvent', (button) => {
+      tracerObj.breakBlock();
+      console.log("break block");
     });
 
     //jump Event Listener
@@ -192,14 +200,14 @@ async function init() {
 
     document.addEventListener('moveJoystick', (event) => {
       const { a, b } = event.detail;
-      moveX +=b*0.005
-      moveZ += a*0.0025
+      moveX +=b*0.001 //left/right 
+      moveZ += a*0.001  //forward/back
     });
 
     document.addEventListener('rotateJoystick', (event) => {
       const { a, b } = event.detail;
-      rotX += -a*0.5
-      rotY += -b*0.5
+      rotX += -a
+      rotY += -b
     });
 
     
@@ -211,14 +219,14 @@ async function init() {
         leftCamera.moveX(moveX);
         leftCamera.moveY(moveY);
         leftCamera.moveZ(moveZ);
-        leftCamera.rotateX(rotX);
-        leftCamera.rotateY(rotY);
+        leftCamera.rotateX(rotX, 1);
+        leftCamera.rotateY(rotY, 1);
         rightCamera._pose.set(e.detail.pose.slice(20, 36));
         rightCamera.moveX(moveX);
         rightCamera.moveY(moveY);
         rightCamera.moveZ(moveZ);
-        rightCamera.rotateX(rotX);
-        rightCamera.rotateY(rotY);
+        rightCamera.rotateX(rotX, -1);
+        rightCamera.rotateY(rotY, -1);
         tracerObj.updateCameraPose();
         
         moveX = 0;

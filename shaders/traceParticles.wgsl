@@ -916,7 +916,9 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f,pBox: vec3f, dBox: vec3f, cameraId
               let size = 4.;
               if ( ((abs(uv.x)) < size/2) && (abs(uv.y) < size/2) ) {
                 if (weather==1){  //rain, blue
-                  color = vec4f(0.,0.,1.,1.);
+                  // color = vec4f(0.,0.,1.,1.);
+                  color = vec4f(60.0/256.0,165.0/256.0,207.0/256.0, 0.25);
+
                 }   
                 else{
                   color = vec4f(1.,1.,1.,1.);
@@ -1021,10 +1023,10 @@ fn updateParticle(@builtin(global_invocation_id) global_id: vec3u) {
     // do your particle simulation and update (just make them fall for now)
     //adjust weather particle based on fall speed
     if (weather == 1){
-      particlesOut[idx].p.y = particlesIn[idx].p.y + 0.005; 
+      particlesOut[idx].p.y = particlesIn[idx].p.y + 0.005;  //speed of RAIN 
     }
     else if (weather== 2){
-      particlesOut[idx].p.y = particlesIn[idx].p.y + 0.001;
+      particlesOut[idx].p.y = particlesIn[idx].p.y + 0.0008; //speed of SNOW
 
     }
 
@@ -1044,7 +1046,7 @@ fn updateParticle(@builtin(global_invocation_id) global_id: vec3u) {
     let terrain = volData[vIdx].terrainType;
     if (i32(terrain) != 0) {
       // if it is non-air type, destroy the particle/respawn it
-      particlesOut[idx].p.y = particlesIn[idx].pInit.y;
+      particlesOut[idx].p.y = 1.0;//particlesIn[idx].pInit.y;
     } else {
       // Otherwise, set it to the cell
       // increase the number of particles in the cell
@@ -1247,7 +1249,7 @@ fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u, @built
     var newpose = cameraPoseIn[cameraId].motor;
     // TODO: Fix raycasts not working
     if (raytrace(spt, vec3f(0, 1, 0), 0.015, true) < 0) {
-      let dt = createTranslator(vec3f(0, 0.002, 0));
+      let dt = createTranslator(vec3f(0, 0.0008, 0));
       newpose = geometricProduct(dt, newpose);
     }
     
