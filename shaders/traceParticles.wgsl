@@ -950,7 +950,7 @@ fn raytrace(p: vec3f, d: vec3f, length: f32) -> bool {
   // find the start and end point
   var hits = rayVolumeIntersection(p, d);
 
-  var curHit = vec2f(hits.x + 0.02, hits.z);
+  var curHit = vec2f(0, hits.z);
 
   let halfSize: vec3f = volInfo.dims.xyz * volInfo.sizes.xyz * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z);
   let voxelSize: vec3f = vec3f(1,1,1) * volInfo.sizes.xyz / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z); // normalized voxel size
@@ -1065,10 +1065,10 @@ fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u, @built
 
     cameraPoseOut[cameraId] = cameraPoseIn[cameraId];
     // TODO: Fix raycasts not working
-    if (!raytrace(spt, vec3f(0, 1, 0), 0.1)) {
+    if (!raytrace(spt, vec3f(0, 1, 0), 0.04)) {
       let dt = createTranslator(vec3f(0, 0.01, 0));
       let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
-      // cameraPoseOut[cameraId].motor = newpose;
+      cameraPoseOut[cameraId].motor = newpose;
     }
   }
 }
