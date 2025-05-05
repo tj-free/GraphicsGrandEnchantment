@@ -285,10 +285,8 @@ var y = 50;
     
     function lockChangeAlert() {
       if (document.pointerLockElement === canvasTag) {
-        console.log("The pointer lock status is now locked");
         document.addEventListener("mousemove", updatePosition, false);
       } else {
-        console.log("The pointer lock status is now unlocked");
         document.removeEventListener("mousemove", updatePosition, false);
       }
     }
