@@ -1054,10 +1054,10 @@ fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u, @built
 
     cameraPoseOut[cameraId] = cameraPoseIn[cameraId];
     // TODO: Fix raycasts not working
-    if (!raytrace(spt, vec3f(0, 1, 0), 0.1)) {
-      let dt = createTranslator(vec3f(0, 0.01, 0));
-      let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
-      cameraPoseOut[cameraId].motor = newpose;
-    }
+    // if (!raytrace(spt, vec3f(0, 1, 0), 0.1)) {
+    //   let dt = createTranslator(vec3f(0, 0.01, 0));
+    //   let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
+    //   cameraPoseOut[cameraId].motor = newpose;
+    // }
   }
 }
