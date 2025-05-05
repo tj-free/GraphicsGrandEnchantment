@@ -30,7 +30,7 @@ The VR portion of the project required significant research and problem-solving:
 - Particle systems for rain and snow
 - Directional lighting affected by weather and wind
 - Basic camera physics: gravity and collision
-- VR projection with dual-camera rendering
+- VR projection with a single eye
 - VR controller input mapping
 
 ---
