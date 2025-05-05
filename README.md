@@ -46,6 +46,7 @@ Despite our progress, we were unable to complete the following due to time const
 - Wind affecting terrain textures
 - Bounding Volume Hierarchy (BVH): researched, but performance was already sufficient (~70 FPS)
 - Gamepad controls: abandoned in favor of direct VR controller integration
+- Implementing a second camera for the second eye on the VR headset
 
 ---
 
