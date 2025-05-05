@@ -321,25 +321,27 @@ struct LightInfo {
 // binding the output texture to store the ray tracing results
 @group(0) @binding(4) var outTextureLeft: texture_storage_2d<rgba8unorm, write>;
 @group(0) @binding(5) var outTextureRight: texture_storage_2d<rgba8unorm, write>;
-@group(0) @binding(6) var leavesTexture: texture_2d<f32>;
-@group(0) @binding(7) var dirtTexture: texture_2d<f32>;
-@group(0) @binding(8) var grassTopTexture: texture_2d<f32>;
-@group(0) @binding(9) var grassSideTexture: texture_2d<f32>;
-@group(0) @binding(10) var snowySideTexture: texture_2d<f32>;
-@group(0) @binding(11) var logTexture: texture_2d<f32>;
-@group(0) @binding(12) var logSideTexture: texture_2d<f32>;
-@group(0) @binding(13) var snowyTopTexture: texture_2d<f32>;
-@group(0) @binding(14) var stoneTexture: texture_2d<f32>;
-@group(0) @binding(15) var leafParticleTexture: texture_2d<f32>;
-@group(0) @binding(16) var particleSheet: texture_2d<f32>;
-@group(0) @binding(17) var<uniform> light: Light;
-@group(0) @binding(18) var inSampler: sampler; // texture sampler
-@group(0) @binding(19) var<storage> particlesIn: array<Particle>;
-@group(0) @binding(20) var<storage,read_write> particlesOut: array<Particle>;
-@group(0) @binding(21) var<uniform> time: f32;
-@group(0) @binding(22) var<uniform> weather: f32;
-@group(0) @binding(23) var<uniform> box: Box;
-@group(0) @binding(24) var skyBoxTexture: texture_2d<f32>;
+@group(0) @binding(6) var dirtTexture: texture_2d<f32>;
+@group(0) @binding(7) var grassTopTexture: texture_2d<f32>;
+@group(0) @binding(8) var grassSideTexture: texture_2d<f32>;
+@group(0) @binding(9) var snowySideTexture: texture_2d<f32>;
+@group(0) @binding(10) var snowyTopTexture: texture_2d<f32>;
+@group(0) @binding(11) var stoneTexture: texture_2d<f32>;
+@group(0) @binding(12) var leafParticleTexture: texture_2d<f32>;
+@group(0) @binding(13) var particleSheet: texture_2d<f32>;
+@group(0) @binding(14) var<uniform> light: Light;
+@group(0) @binding(15) var inSampler: sampler; // texture sampler
+@group(0) @binding(16) var<storage> particlesIn: array<Particle>;
+@group(0) @binding(17) var<storage,read_write> particlesOut: array<Particle>;
+@group(0) @binding(18) var<uniform> time: f32;
+@group(0) @binding(19) var<uniform> weather: f32;
+@group(0) @binding(20) var<uniform> box: Box;
+@group(0) @binding(21) var skyFront: texture_2d<f32>;
+@group(0) @binding(22) var skyBack: texture_2d<f32>;
+@group(0) @binding(23) var skyLeft: texture_2d<f32>;
+@group(0) @binding(24) var skyRight: texture_2d<f32>;
+@group(0) @binding(25) var skyUp: texture_2d<f32>;
+@group(0) @binding(26) var skyDown: texture_2d<f32>;
 
 /////////////////////////////////////
 
@@ -723,39 +725,39 @@ fn boxDiffuseColor(idx: i32, hitPoint: vec3f) -> vec4f {
   var color: vec4f;
     switch(idx) {
       case 0: { //front
-        let textDim=vec2f(textureDimensions(skyBoxTexture,0));
+        let textDim=vec2f(textureDimensions(skyFront,0));
         // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
-        color=textureLoad(skyBoxTexture, vec2i((hitPoint.xy-vec2f(-0.5*box.scale.xy))/box.scale.xy*textDim),0);
+        color=textureLoad(skyFront, vec2i((hitPoint.xy-vec2f(-0.5*box.scale.xy))/box.scale.xy*textDim),0);
         break;
       }
       case 1: { //back
-        let textDim=vec2f(textureDimensions(skyBoxTexture,0));
+        let textDim=vec2f(textureDimensions(skyBack,0));
         // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
-        color=textureLoad(skyBoxTexture, vec2i((hitPoint.xy-vec2f(-0.5*box.scale.xy))/box.scale.xy*textDim),0);
+        color=textureLoad(skyBack, vec2i((hitPoint.xy-vec2f(-0.5*box.scale.xy))/box.scale.xy*textDim),0);
         break;
       }
       case 2: { //left
-        let textDim=vec2f(textureDimensions(skyBoxTexture,0));
+        let textDim=vec2f(textureDimensions(skyLeft,0));
         // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
-        color=textureLoad(skyBoxTexture, vec2i((hitPoint.yz-vec2f(-0.5*box.scale.yz))/box.scale.yz*textDim),0);
+        color=textureLoad(skyLeft, vec2i((hitPoint.yz-vec2f(-0.5*box.scale.yz))/box.scale.yz*textDim),0);
         break;
       }
       case 3: { //right
-        let textDim=vec2f(textureDimensions(skyBoxTexture,0));
+        let textDim=vec2f(textureDimensions(skyRight,0));
         // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
-        color=textureLoad(skyBoxTexture, vec2i((hitPoint.yz-vec2f(-0.5*box.scale.yz))/box.scale.yz*textDim),0);
+        color=textureLoad(skyRight, vec2i((hitPoint.yz-vec2f(-0.5*box.scale.yz))/box.scale.yz*textDim),0);
         break;
       }
       case 4: { //top
-        let textDim=vec2f(textureDimensions(skyBoxTexture,0));
+        let textDim=vec2f(textureDimensions(skyDown,0));
         // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
-        color=textureLoad(skyBoxTexture, vec2i((hitPoint.xz-vec2f(-0.5*box.scale.xz))/box.scale.xz*textDim),0);
+        color=textureLoad(skyDown, vec2i((hitPoint.xz-vec2f(-0.5*box.scale.xz))/box.scale.xz*textDim),0);
         break;
       }
       case 5: { //down
-        let textDim=vec2f(textureDimensions(skyBoxTexture,0));
+        let textDim=vec2f(textureDimensions(skyUp,0));
         // color = vec4f(232.f/255, 119.f/255, 34.f/255, 1.); // Bucknell Orange 1
-        color=textureLoad(skyBoxTexture, vec2i((hitPoint.xz-vec2f(-0.5*box.scale.xz))/box.scale.xz*textDim),0);
+        color=textureLoad(skyUp, vec2i((hitPoint.xz-vec2f(-0.5*box.scale.xz))/box.scale.xz*textDim),0);
         break;
       }
       default: {
