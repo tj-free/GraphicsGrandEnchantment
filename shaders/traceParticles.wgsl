@@ -1097,6 +1097,7 @@ fn checkPlace(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
   var hits = rayVolumeIntersection(p, d);
   var delta = 0.001;
   var maxLength = 0.075;
+  var minLength = 0.005;
   var prevPos: vec3f;
 
   if (hits.y < 0) {
@@ -1109,7 +1110,7 @@ fn checkPlace(uv: vec2i, p: vec3f, d: vec3f, cameraId: u32) {
   let halfSize: vec3f = volInfo.dims.xyz * volInfo.sizes.xyz * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z);
   let voxelSize: vec3f = vec3f(1,1,1) * volInfo.sizes.xyz / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z); // normalized voxel size
 
-  while (curHit.x < 1.0) {
+  while ( (curHit.x < maxLength)  ) {
     var curPt: vec3f = p + d * curHit.x + halfSize;
     let vPos = curPt / (voxelSize);
     var minCorner = floor(vPos);
