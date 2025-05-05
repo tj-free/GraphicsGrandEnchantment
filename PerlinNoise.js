@@ -70,7 +70,7 @@ async function init() {
   await tracer.setTracerObject(tracerObj);
 
   // leftCamera.moveZ(-2);
-  leftCamera.moveY(-2);
+  leftCamera.moveY(-1);
   // leftCamera.moveZ(-5);
   // NOTE: cameras need to be rotated?
   // How do humans see
@@ -78,9 +78,9 @@ async function init() {
   leftCamera.moveX(-0.000);
   // leftCamera.rotateY(5);
   // rightCamera.moveZ(-2);
-  rightCamera.moveY(-2);
+  rightCamera.moveY(-1);
   // rightCamera.moveX(-0.0298200368);
-  rightCamera.moveX(0.008);
+  rightCamera.moveX(.1);
   rightCamera.rotateY(-5);
 
   var directionalLight= new DirectionalLight();
@@ -242,25 +242,46 @@ async function init() {
     //Weather Event Listener
     document.addEventListener('weatherEvent', (button) => {
       console.log("weather event")
+      VRInput.setWeather(1)
       
       Input.getWeather(tracerObj, directionalLight); //change lighting
       tracerObj.updateLight(directionalLight);
 
-     
+      tracerObj.cycleWeather();
     });
 
     //break Event Listener
     document.addEventListener('breakEvent', (button) => {
       console.log("break event recieved")
      //TODO: call break function here
+     
     });
 
     //jump Event Listener
     document.addEventListener('jumpEvent', (button) => {
-      console.log("jump event recieved")
-     //TODO: call jump function here
+      console.log("jump event recieved");
+      leftCamera.moveY(-movespeed);
+      rightCamera.moveY(-movespeed);
+      tracerObj.updateCameraPose();
     });
 
+    document.addEventListener('moveJoystick', (event) => {
+      const { a, b } = event.detail;
+      leftCamera.moveX(b*0.005); //left/right
+      leftCamera.moveZ(a*0.0025); //up/down
+      rightCamera.moveX(b*0.005);
+      rightCamera.moveZ(a*0.0025); 
+      tracerObj.updateCameraPose();
+    });
+
+    document.addEventListener('rotateJoystick', (event) => {
+      const { a, b } = event.detail;
+      leftCamera.rotateY(-b*0.5);
+      leftCamera.rotateX(-a*0.5);
+      rightCamera.rotateY(-b*0.5);
+      rightCamera.rotateX(-a*0.5);
+      tracerObj.updateCameraPose();
+    });
 
     
   

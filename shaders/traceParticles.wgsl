@@ -873,8 +873,10 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f,pBox: vec3f, dBox: vec3f, cameraId
         //   7. finally, modulate the diffuse color by the light
         // lightInfo.intensity = toon(lightInfo.intensity, 5);
         diffuse *= saturate(lightInfo.intensity);
+        //add
+        var ambient = vec4f(0.1, 0.1, 0.1, 1);
         // last, compute the final color. Here Lambertian = emit + diffuse
-        color = diffuse;
+        color = diffuse + ambient;
         
         break;
       } 
@@ -985,6 +987,7 @@ fn raytrace(p: vec3f, d: vec3f, length: f32) -> bool {
   return false;
 }
 
+
 @compute
 @workgroup_size(64)
 fn resetCellInfo(@builtin(global_invocation_id) global_id: vec3u) {
@@ -1009,7 +1012,16 @@ fn updateParticle(@builtin(global_invocation_id) global_id: vec3u) {
     particlesOut[idx] = particlesIn[idx];
 
     // do your particle simulation and update (just make them fall for now)
-    particlesOut[idx].p.y = particlesIn[idx].p.y + 0.01;
+    //adjust weather particle based on fall speed
+    if (weather == 1){
+      particlesOut[idx].p.y = particlesIn[idx].p.y + 0.005; 
+    }
+    else if (weather== 2){
+      particlesOut[idx].p.y = particlesIn[idx].p.y + 0.001;
+
+    }
+
+    
 
     // based on the new particle location, put them into a cell
     var p = particlesOut[idx].p.xyz;
@@ -1067,8 +1079,8 @@ fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u, @built
 
     cameraPoseOut[cameraId] = cameraPoseIn[cameraId];
     // TODO: Fix raycasts not working
-    if (!raytrace(spt, vec3f(0, 1, 0), 0.1)) {
-      let dt = createTranslator(vec3f(0, 0.01, 0));
+    if (!raytrace(spt, vec3f(0, 1, 0), 0.04)) {
+      let dt = createTranslator(vec3f(0, 0.005, 0));
       let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
       // cameraPoseOut[cameraId].motor = newpose;
     }
