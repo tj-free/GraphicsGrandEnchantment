@@ -265,9 +265,11 @@ async function init() {
     
   
     document.addEventListener("updateCameraPose", (e) => {
-      leftCamera._pose.set(e.detail.pose.slice(0,16));
-      rightCamera._pose.set(e.detail.pose.slice(16));
-      tracerObj.updateCameraPose();
+      if (e.detail.pose.size > 0) {
+        leftCamera._pose.set(e.detail.pose.slice(0,16));
+        rightCamera._pose.set(e.detail.pose.slice(16));
+        tracerObj.updateCameraPose();
+      }
     })
 
    
