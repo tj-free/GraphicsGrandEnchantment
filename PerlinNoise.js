@@ -38,6 +38,7 @@ import MassParticleSystem from './lib/DSViz/MassParticleSystem.js'
 import Renderer from './lib/Viz/2DRenderer.js'
 import ParticleSystemObject from './lib/DSViz/ParticleSystemObject.js'
 import DirectionalLight from './lib/Viz/DirectionalLight.js'
+import PGA3D from './lib/Math/PGA3D.js'
 
 
 async function init() {
@@ -218,6 +219,9 @@ async function init() {
         tracerObj.cycleWeather()
         console.log(tracerObj._weather)
         break;
+      case "2": 
+        await tracerObj.breakBlock();
+        break;
 
   }
   });
@@ -255,6 +259,8 @@ async function init() {
 
      
     });
+
+
 
     //break Event Listener
     document.addEventListener('breakEvent', (button) => {
