@@ -881,46 +881,60 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f,pBox: vec3f, dBox: vec3f, cameraId
         // we're hitting air, render particles
 
         // set the color to the particle color and break the loop
-        
-        var isHit = 0;
-        var pIdx = -1;
-        var numParticles = atomicLoad(&volData[vIdx].numOfParticles);
-        for (var i = 0; i < numParticles; i++) {
-          pIdx = volData[vIdx].particleIndices[i];
-          if (pIdx != -1) {
-            var particle = particlesOut[pIdx];
-            let t = dot(particle.p.xyz - p, forward) / dot(d, forward);
-            let hitPt = p + t * d;
+        //render particles based on weather
 
-            // determine if hitPt inside the quad centered at the particle using right and up
-            let uv = vec2f(dot(right, hitPt - particle.p.xyz), dot(up, hitPt - particle.p.xyz)); 
 
-            let size = 4.;
-            if ( ((abs(uv.x)) < size/2) && (abs(uv.y) < size/2) ) {   
-              color = vec4f(1.,1.,1.,1.);
-              // see the particle, 
-              isHit = 1;
+        if (weather != 0){
+
+          var isHit = 0;
+          var pIdx = -1;
+          var numParticles = atomicLoad(&volData[vIdx].numOfParticles);
+          for (var i = 0; i < numParticles; i++) {
+            pIdx = volData[vIdx].particleIndices[i];
+            if (pIdx != -1) {
+              var particle = particlesOut[pIdx];
+              let t = dot(particle.p.xyz - p, forward) / dot(d, forward);
+              let hitPt = p + t * d;
+
+              // determine if hitPt inside the quad centered at the particle using right and up
+              let uv = vec2f(dot(right, hitPt - particle.p.xyz), dot(up, hitPt - particle.p.xyz)); 
+
+              let size = 4.;
+              if ( ((abs(uv.x)) < size/2) && (abs(uv.y) < size/2) ) {
+                if (weather==1){  //rain, blue
+                  color = vec4f(0.,0.,1.,1.);
+
+                }   
+                else{
+                  color = vec4f(1.,1.,1.,1.);
+
+                }
+
+                //TODO: check weather here to adjust the color for particles
+                // see the particle, 
+                isHit = 1;
+              }
+            } else {  
+              // reached the end of the loaded indeces, don't need to look for any more
+              break;
             }
-          } else {
-            // reached the end of the loaded indeces, don't need to look for any more
+          }
+          if (isHit == 1) { // no need to march if it hits a particle
             break;
           }
+        
+          // if it is the air, we need to update the hit point, right?
+            // If we don't hit anything
+          minCorner = minCorner * voxelSize - halfSize;
+          maxCorner = minCorner + voxelSize;
+          curHit = getNextHitValue(hits.x, curHit, minCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy, 0); // xy
+          curHit = getNextHitValue(hits.x, curHit, maxCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy, 1);
+          curHit = getNextHitValue(hits.x, curHit, minCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz, 2); // yz
+          curHit = getNextHitValue(hits.x, curHit, maxCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz, 3);
+          curHit = getNextHitValue(hits.x, curHit, minCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz, 5); // xz
+          curHit = getNextHitValue(hits.x, curHit, maxCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz, 4);
         }
-        if (isHit == 1) { // no need to march if it hits a particle
-          break;
-        }
-      
-      	// if it is the air, we need to update the hit point, right?
-          // If we don't hit anything
-        minCorner = minCorner * voxelSize - halfSize;
-        maxCorner = minCorner + voxelSize;
-        curHit = getNextHitValue(hits.x, curHit, minCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy, 0); // xy
-        curHit = getNextHitValue(hits.x, curHit, maxCorner.z, minCorner.xy, maxCorner.xy, p.z, d.z, p.xy, d.xy, 1);
-        curHit = getNextHitValue(hits.x, curHit, minCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz, 2); // yz
-        curHit = getNextHitValue(hits.x, curHit, maxCorner.x, minCorner.yz, maxCorner.yz, p.x, d.x, p.yz, d.yz, 3);
-        curHit = getNextHitValue(hits.x, curHit, minCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz, 5); // xz
-        curHit = getNextHitValue(hits.x, curHit, maxCorner.y, minCorner.xz, maxCorner.xz, p.y, d.y, p.xz, d.xz, 4);
-        }
+      }
       // hit five times q, then five times w, then five times d to see the terrain
     }
     curHit.x += delta;
@@ -1054,10 +1068,18 @@ fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u, @built
 
     cameraPoseOut[cameraId] = cameraPoseIn[cameraId];
     // TODO: Fix raycasts not working
+<<<<<<< HEAD
     // if (!raytrace(spt, vec3f(0, 1, 0), 0.1)) {
     //   let dt = createTranslator(vec3f(0, 0.01, 0));
     //   let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
     //   cameraPoseOut[cameraId].motor = newpose;
     // }
+=======
+    if (!raytrace(spt, vec3f(0, 1, 0), 0.1)) {
+      let dt = createTranslator(vec3f(0, 0.01, 0));
+      let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
+      // cameraPoseOut[cameraId].motor = newpose;
+    }
+>>>>>>> vrControls2
   }
 }

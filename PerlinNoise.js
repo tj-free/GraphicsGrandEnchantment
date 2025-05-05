@@ -207,12 +207,15 @@ async function init() {
         // currWeather = (currWeather + 1) %3; // cycle through values
         Input.getWeather(tracerObj, directionalLight);
         tracerObj.updateLight(directionalLight);
+
+        tracerObj.cycleWeather()
+        console.log(tracerObj._weather)
         break;
 
   }
   });
 
-  
+
 
 
  
@@ -235,6 +238,31 @@ async function init() {
     tracerObj.updateCameraPose(); // your own method to sync visuals
     
     });
+
+    //Weather Event Listener
+    document.addEventListener('weatherEvent', (button) => {
+      console.log("weather event")
+      
+      Input.getWeather(tracerObj, directionalLight); //change lighting
+      tracerObj.updateLight(directionalLight);
+
+     
+    });
+
+    //break Event Listener
+    document.addEventListener('breakEvent', (button) => {
+      console.log("break event recieved")
+     //TODO: call break function here
+    });
+
+    //jump Event Listener
+    document.addEventListener('jumpEvent', (button) => {
+      console.log("jump event recieved")
+     //TODO: call jump function here
+    });
+
+
+    
   
 
 
