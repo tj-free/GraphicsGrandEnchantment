@@ -70,7 +70,7 @@ async function init() {
   await tracer.setTracerObject(tracerObj);
 
   // leftCamera.moveZ(-2);
-  leftCamera.moveY(-2);
+  leftCamera.moveY(-.5);
   // leftCamera.moveZ(-5);
   // NOTE: cameras need to be rotated?
   // How do humans see
@@ -78,7 +78,7 @@ async function init() {
   leftCamera.moveX(-0.000);
   // leftCamera.rotateY(5);
   // rightCamera.moveZ(-2);
-  rightCamera.moveY(-2);
+  rightCamera.moveY(-.5);
   // rightCamera.moveX(-0.0298200368);
   rightCamera.moveX(0.008);
   rightCamera.rotateY(-5);
@@ -105,7 +105,8 @@ async function init() {
                                           'U: Toggle Camera/Object\n'+
                                           'B: Toggle Models\n'+
                                           '1: Toggle Weather');
-  var movespeed = 0.05;
+  var movespeed = 0.005;
+  var jumpspeed = 0.03;
   var rotatespeed = 2;
   var focalXSpeed = 0.1;
   var focalYSpeed = 0.1;
@@ -123,32 +124,38 @@ async function init() {
         leftCamera.moveZ(movespeed);
         rightCamera.moveZ(movespeed);
         tracerObj.updateCameraPose();
+        await tracerObj.getRaycastChecks();
         break;
       case 'a': case 'A':
         leftCamera.moveX(-movespeed);
         rightCamera.moveX(-movespeed);
         tracerObj.updateCameraPose();
+        await tracerObj.getRaycastChecks();
         break;
       case 's': case 'S':
         leftCamera.moveZ(-movespeed);
         rightCamera.moveZ(-movespeed);
         tracerObj.updateCameraPose();
+        await tracerObj.getRaycastChecks();
         break;
       case 'd': case 'D':
         leftCamera.moveX(movespeed);
         rightCamera.moveX(movespeed);
         tracerObj.updateCameraPose();
+        await tracerObj.getRaycastChecks();
         break;
       case ' ':
-        leftCamera.moveY(-movespeed);
-        rightCamera.moveY(-movespeed);
+        leftCamera.moveY(-jumpspeed);
+        rightCamera.moveY(-jumpspeed);
         tracerObj.updateCameraPose();
+        await tracerObj.getRaycastChecks();
         break;
-      case 'Shift':
-        leftCamera.moveY(movespeed);
-        rightCamera.moveY(movespeed);
-        tracerObj.updateCameraPose();
-        break;
+      // case 'Shift':
+      //   leftCamera.moveY(movespeed);
+      //   rightCamera.moveY(movespeed);
+      //   tracerObj.updateCameraPose();
+      //   await tracerObj.getRaycastChecks();
+      //   break;
       case 'q': case 'Q':
         leftCamera.rotateZ(rotatespeed);
         rightCamera.rotateZ(rotatespeed);
@@ -265,15 +272,18 @@ async function init() {
     
   
     document.addEventListener("updateCameraPose", (e) => {
-      if (e.detail.pose.size > 0) {
+      console.log(e.detail.pose.length)
+      if (e.detail.pose.length == 48) {
         leftCamera._pose.set(e.detail.pose.slice(0,16));
         rightCamera._pose.set(e.detail.pose.slice(16));
         tracerObj.updateCameraPose();
       }
     })
 
-   
-  
+  setInterval(async () => {
+    await tracerObj.getRaycastChecks();
+  }, 50)
+
   // Update FPS text
   setInterval(() => {
     fpsText.updateText('VR FPS: ' + tracer._VRFps + '\n' + 'FPS: ' + tracer._fps);
@@ -288,7 +298,3 @@ init().then( ret => {
   document.body.appendChild(pTag);
   document.getElementById("renderCanvas").remove();
 });
-
-
-
-

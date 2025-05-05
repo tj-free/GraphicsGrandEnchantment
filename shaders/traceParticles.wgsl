@@ -946,7 +946,7 @@ fn traceTerrain(uv: vec2i, p: vec3f, d: vec3f,pBox: vec3f, dBox: vec3f, cameraId
   }
 }
 
-fn raytrace(p: vec3f, d: vec3f, length: f32) -> bool {
+fn raytrace(p: vec3f, d: vec3f, length: f32, hit: bool) -> f32 {
   // find the start and end point
   var hits = rayVolumeIntersection(p, d);
 
@@ -965,8 +965,15 @@ fn raytrace(p: vec3f, d: vec3f, length: f32) -> bool {
       let vIdx: i32 = i32(vPos.z) * i32(volInfo.dims.x * volInfo.dims.y)
                       + i32(vPos.y) * i32(volInfo.dims.x)
                       + i32(vPos.x);
-      if (i32(volData[vIdx].terrainType) != 0) {
-           return true;
+      if (hit) {
+        if (i32(volData[vIdx].terrainType) != 0) {
+          return curHit.x;
+        }
+      }
+      else {
+        if (i32(volData[vIdx].terrainType) == 0) {
+          return curHit.x;
+        }
       }
     }
     // If we don't hit anything
@@ -980,7 +987,7 @@ fn raytrace(p: vec3f, d: vec3f, length: f32) -> bool {
     }
     curHit.x += 0.002;
   }
-  return false;
+  return -1;
 }
 
 @compute
@@ -1060,15 +1067,69 @@ fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u, @built
 
     spt = transformPt(spt, cameraId);
     rdir = transformDir(rdir, cameraId);
+    
+    var sptFoot = transformPt(spt, cameraId);
 
     traceTerrain(uv, spt, rdir, sptBox, rdirBox, cameraId);
 
     cameraPoseOut[cameraId] = cameraPoseIn[cameraId];
+    var newpose = cameraPoseIn[cameraId].motor;
     // TODO: Fix raycasts not working
-    if (!raytrace(spt, vec3f(0, 1, 0), 0.04)) {
-      let dt = createTranslator(vec3f(0, 0.01, 0));
-      let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
-      cameraPoseOut[cameraId].motor = newpose;
+    if (raytrace(spt, vec3f(0, 1, 0), 0.015, true) < 0) {
+      let dt = createTranslator(vec3f(0, 0.002, 0));
+      newpose = geometricProduct(dt, newpose);
     }
+    
+    var minDir: vec3f;
+    var minDist: f32 = 999999;
+    var rayDir = vec3f(1, 0, 0);
+    var rayDist = raytrace(spt, rayDir, 0.5, false);
+    if (rayDist > 0) {
+      minDist = rayDist;
+      minDir = rayDir;
+    }
+    rayDir = vec3f(-1, 0, 0);
+    rayDist = raytrace(spt, rayDir, 0.5, false);
+    if (rayDist < minDist && rayDist > 0) {
+      minDist = rayDist;
+      minDir = rayDir;
+    }
+    rayDir = vec3f(0, 0, 1);
+    rayDist = raytrace(spt, rayDir, 0.5, false);
+    if (rayDist < minDist && rayDist > 0) {
+      minDist = rayDist;
+      minDir = rayDir;
+    }
+    rayDir = vec3f(0, 0, -1);
+    rayDist = raytrace(spt, rayDir, 0.5, false);
+    if (rayDist < minDist && rayDist > 0) {
+      minDist = rayDist;
+      minDir = rayDir;
+    }
+    if (minDist > 0) {
+      let dt = createTranslator(minDir * minDist);
+      newpose = geometricProduct(dt, newpose);
+    }
+    cameraPoseOut[cameraId].motor = newpose;
+    // if (rayDist <= 0.05 && rayDist > 0) {
+    //   let dt = createTranslator(vec3f(-rayDist  , 0, 0));
+    //   let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
+    //   cameraPoseOut[cameraId].motor = newpose;
+    // }
+    // if (rayDist <= 0.05 && rayDist > 0) {
+    //   let dt = createTranslator(vec3f(rayDist, 0, 0));
+    //   let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
+    //   cameraPoseOut[cameraId].motor = newpose;
+    // }
+    // if (rayDist <= 0.05 && rayDist > 0) {
+    //   let dt = createTranslator(vec3f(0, 0, -rayDist));
+    //   let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
+    //   cameraPoseOut[cameraId].motor = newpose;
+    // }
+    // if (rayDist <= 0.05 && rayDist > 0) {
+    //   let dt = createTranslator(vec3f(0, 0, rayDist));
+    //   let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
+    //   cameraPoseOut[cameraId].motor = newpose;
+    // }
   }
 }
