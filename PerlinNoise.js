@@ -217,10 +217,13 @@ async function init() {
         tracerObj.updateLight(directionalLight);
 
         tracerObj.cycleWeather()
-        console.log(tracerObj._weather)
+        //console.log(tracerObj._weather)
         break;
       case "2": 
         await tracerObj.breakBlock();
+        break;
+      case "3": 
+        await tracerObj.placeBlock();
         break;
 
   }
@@ -252,7 +255,7 @@ async function init() {
 
     //Weather Event Listener
     document.addEventListener('weatherEvent', (button) => {
-      console.log("weather event")
+      //console.log("weather event")
       
       Input.getWeather(tracerObj, directionalLight); //change lighting
       tracerObj.updateLight(directionalLight);
@@ -264,13 +267,13 @@ async function init() {
 
     //break Event Listener
     document.addEventListener('breakEvent', (button) => {
-      console.log("break event recieved")
+      //console.log("break event recieved")
      //TODO: call break function here
     });
 
     //jump Event Listener
     document.addEventListener('jumpEvent', (button) => {
-      console.log("jump event recieved")
+      //console.log("jump event recieved")
      //TODO: call jump function here
     });
 
@@ -297,7 +300,7 @@ async function init() {
   return tracer;
 }
 init().then( ret => {
-  console.log(ret);
+  //console.log(ret);
 }).catch( error => {
   const pTag = document.createElement('p');
   pTag.innerHTML = navigator.userAgent + "</br>" + error.message;
