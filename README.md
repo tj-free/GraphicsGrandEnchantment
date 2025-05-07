@@ -30,7 +30,7 @@ The VR portion of the project required significant research and problem-solving:
 - Particle systems for rain and snow
 - Directional lighting affected by weather
 - Basic camera physics: gravity and collision
-- VR projection with dual-camera rendering
+- VR projection with a single eye
 - VR controller input mapping
 - Breaking/Placing Blocks
 - Reading VR and Keyboard inputs from the user.
@@ -61,7 +61,7 @@ Despite our progress, we were unable to complete the following due to time const
 
 ### Kevin Duong
 
-This project was a lot of work filled with a ton of struggles. We set the bar quite high for ourselves, and to be honest, I was more than satisfied with the progress we've made over these past 4 weeks. While it was difficult and we had a lot of questions, it was incredibly rewarding to see the rendered scene as we completed each function. I personally struggled to comprehend the different parts of the project at first. But as I spent more time with the code, I gained a much better understanding of how the CPU and GPU communicate and how to navigate shaders—something I didn't fully grasp during the earlier quests because I rushed through them. Overall, I really enjoyed the outcome, especially the time spent with my friends and the challenges we overcame together.
+This project was a lot of work filled with a ton of struggles. We set the bar quite high for ourselves, and to be honest, I was more than satisfied with the progress we've made over these past 4 weeks. While it was difficult and we had a lot of questions, it was incredibly rewarding to see the rendered scene as we completed each function. I personally struggled to comprehend the different parts of the project at first especially with the textures and the texture maping of the skybox and the environment. Additonally, the rest of the time was just helping others and cleaning up both the code and the documentation. But as I spent more time with the code, I gained a much better understanding of how the CPU and GPU communicate and how to navigate shaders—something I didn't fully grasp during the earlier quests because I rushed through them. Overall, I really enjoyed the outcome, especially the time spent with my friends and the challenges we overcame together.
 
 ---
 
