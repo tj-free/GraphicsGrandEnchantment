@@ -28,11 +28,12 @@ The VR portion of the project required significant research and problem-solving:
 - Environment-mapped skybox
 - Toggleable weather (sunny, rain, snow)
 - Particle systems for rain and snow
-- Directional lighting affected by weather and wind
+- Directional lighting affected by weather
 - Basic camera physics: gravity and collision
 - VR projection with dual-camera rendering
 - VR controller input mapping
-
+- Breaking/Placing Blocks
+- Reading VR and Keyboard inputs from the user.
 ---
 
 ## Challenges & Features Not Implemented
@@ -40,12 +41,19 @@ The VR portion of the project required significant research and problem-solving:
 Despite our progress, we were unable to complete the following due to time constraints:
 
 - Cloud implementation
+    - We ran out of time to be able to create additonal objects onto the surface and we were unsure how much updating those would decrease the number of frames.
 - Texturing particles (e.g., snowflakes, raindrops)
+    - We ran out of time to be able to map the textures onto the surface.
 - Breaking block animations and textures
+    - We ran out of time to map create random textures and to interpolate them randomly and apply the texture to those particles.
 - Procedural tree generation and leaf animations
-- Wind affecting terrain textures
+    - We ran out of time to be able to place objects onto the surface and to apply the textures and animations to the surface.
+- Wind affecting weather textures
+    - We ran out of time to be able to figure out why when we interpolated the surface, it caused additonal problems.
 - Bounding Volume Hierarchy (BVH): researched, but performance was already sufficient (~70 FPS)
-- Gamepad controls: abandoned in favor of direct VR controller integration
+    - After adjusting the resolution, we have decided that there was not a need ot use it since we were getting roughly ~70 frames which is more than enough
+- Gamepad controls: abandoned in favor of direct VR controller integration.
+    - After diving straight into the VR controllers and getting those bindings mapped, we have decided that we no longer need to use a standard Gamepad controller.
 
 ---
 
