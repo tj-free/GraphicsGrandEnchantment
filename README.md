@@ -71,8 +71,10 @@ My responsibilities for this project were to set up the 3D particle system and h
 
 ---
 
-### Clea Ramos  
+### Clea Ramos
+
 My contributions to this project consisted of implementing VR controls, assisting with eye rendering, and incorporating behavior and change in weather conditions. One of the most challenging components was the VR eye rendering, which Jackson and I worked on. After many attempts of trial and error of testing and calibrating camera positions and rotations we were able to get the VR view close, but not perfectly aligned between the camera/eye positions. I.also enjoyed implementing the VR controls as it was satisfying to see the external outputs like the joysticks being turned into movements. Overall, we were ambitious with the functionality we wanted to achieve and we underestimated the time it would take to complete certain function points, such as VR eye rendering, or the 3D weather particle system. Furthermore, some function points took longer than expected due to time needed to learn new concepts and debug unforeseen issues such as setting up the headset. This project allowed me to gain more practice implementing the interaction between all the components between the GPU and CPU and to create different effects in 3D. I now have a better understanding of how bindings pass values to the shader, and the mathematical techniques to implement gravity and effects on particles. I also became more comfortable with creating listener events to handle numerous inputs. Something that I would do differently is be more involved in the particle system components or racing volumes as I am not as familiar with those topics. I also wish I had more time to implement wind or more complex particle movement for the weather effects such as wind or random swaying movement for snow. Overall, I learned a lot and enjoyed this project as we had challenging, but fun times problem solving and creating together!
+
 ---
 
 ### Jackson Rubiano  
