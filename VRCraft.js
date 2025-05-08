@@ -134,7 +134,6 @@ async function init() {
         tracerObj.updateLight(directionalLight);
 
         tracerObj.cycleWeather()
-        //console.log(tracerObj._weather)
         break;
       case "2": 
         await tracerObj.breakBlock();
@@ -152,20 +151,23 @@ async function init() {
   var rotX = 0;
   var rotY = 0;
  
-    // Rotate camera horizontally (Y-axis) and vertically (X-axis)
-    document.addEventListener("mousemove", (event) => {
-      canvasTag.requestPointerLock();
-
+  document.addEventListener("mousedown", (event) => {
+    canvasTag.requestPointerLock();
+  });
+   
+  // Rotate camera horizontally (Y-axis) and vertically (X-axis)
+  document.addEventListener("mousemove", (event) => {
+    if (document.pointerLockElement) {
       let dir = Math.atan(event.movementY / event.movementX);
       let moved = Input.getMouseMovement()
       const sensitivity = 0.05; // tune this based on feel
       rotY -= event.movementX * sensitivity;
       rotX += event.movementY * sensitivity;
-    });
+    }
+  });
 
     //Weather Event Listener
     document.addEventListener('weatherEvent', (button) => {
-      console.log("weather event")
       VRInput.setWeather(1)
       
       Input.getWeather(tracerObj, directionalLight); //change lighting
@@ -179,14 +181,12 @@ async function init() {
     //place Event Listener
     document.addEventListener('placeBlockEvent', (button) => {
       tracerObj.placeBlock();
-      console.log("break block");
 
     });
 
      //break Event Listener
      document.addEventListener('breakBlockEvent', (button) => {
       tracerObj.breakBlock();
-      console.log("break block");
     });
 
     //jump Event Listener
@@ -244,7 +244,6 @@ async function init() {
   return tracer;
 }
 init().then( ret => {
-  //console.log(ret);
 }).catch( error => {
   const pTag = document.createElement('p');
   pTag.innerHTML = navigator.userAgent + "</br>" + error.message;

@@ -1249,7 +1249,7 @@ fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u, @built
     var newpose = cameraPoseIn[cameraId].motor;
     // TODO: Fix raycasts not working
     if (raytrace(spt, vec3f(0, 1, 0), 0.015, true) < 0) {
-      let dt = createTranslator(vec3f(0, 0.0008, 0));
+      let dt = createTranslator(vec3f(0, 0.008, 0));
       newpose = geometricProduct(dt, newpose);
     }
     
@@ -1284,25 +1284,5 @@ fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u, @built
       newpose = geometricProduct(dt, newpose);
     }
     cameraPoseOut[cameraId].motor = newpose;
-    // if (rayDist <= 0.05 && rayDist > 0) {
-    //   let dt = createTranslator(vec3f(-rayDist  , 0, 0));
-    //   let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
-    //   cameraPoseOut[cameraId].motor = newpose;
-    // }
-    // if (rayDist <= 0.05 && rayDist > 0) {
-    //   let dt = createTranslator(vec3f(rayDist, 0, 0));
-    //   let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
-    //   cameraPoseOut[cameraId].motor = newpose;
-    // }
-    // if (rayDist <= 0.05 && rayDist > 0) {
-    //   let dt = createTranslator(vec3f(0, 0, -rayDist));
-    //   let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
-    //   cameraPoseOut[cameraId].motor = newpose;
-    // }
-    // if (rayDist <= 0.05 && rayDist > 0) {
-    //   let dt = createTranslator(vec3f(0, 0, rayDist));
-    //   let newpose = geometricProduct(dt, cameraPoseIn[cameraId].motor);
-    //   cameraPoseOut[cameraId].motor = newpose;
-    // }
   }
 }
