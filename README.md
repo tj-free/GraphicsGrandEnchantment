@@ -8,6 +8,8 @@ The skybox is textured with an environment map to emulate realistic sky conditio
 
 We implemented basic physics for the VR camera, including gravity and collision detection, enabling immersive movement and interaction with the terrain. Most of our initial goals were successfully implemented.
 
+[Video Demo](https://drive.google.com/file/d/14pBsv0mTmh1Uf-gfxCkg3gX9PoC77FE-/view?usp=sharing)
+
 ---
 
 ## VR Implementation
