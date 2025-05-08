@@ -61,13 +61,13 @@ async function init() {
   [leftCamera, rightCamera], true, blockTextures.concat(particleTextures));
 
   
-  var vrInput = new VRInput();
-  var input = new Input(canvasTag);
+  // var vrInput = new VRInput();
+  // var input = new Input(canvasTag);
 
   await tracer.setTracerObject(tracerObj);
 
   // leftCamera.moveZ(-2);
-  leftCamera.moveY(-.5);
+  leftCamera.moveY(-.25);
   // leftCamera.moveZ(-5);
   // NOTE: cameras need to be rotated?
   // How do humans see
@@ -75,7 +75,7 @@ async function init() {
   // leftCamera.moveX(0.01);
   // leftCamera.rotateY(-1);
   // rightCamera.moveZ(-2);
-  rightCamera.moveY(-.5);
+  rightCamera.moveY(-.25);
   // rightCamera.moveX(-0.0298200368);
   // rightCamera.moveX(-0.01);
   // rightCamera.rotateY(1);
@@ -91,7 +91,8 @@ async function init() {
   
   let fps = '??';
   var fpsText = new StandardTextObject('VR FPS: ' + 100 + '\n' + 'FPS: ' + 100);
-  fpsText._textCanvas.style.left="1000px";
+  fpsText._textCanvas.style.left="";
+  fpsText._textCanvas.style.right="50px";
   const infoText = new StandardTextObject('WS: Move Forward\n' +
                                           'AD: Move Left/Right\n' +
                                           'Space: Jump\n' +
@@ -99,12 +100,14 @@ async function init() {
                                           '1: Toggle Weather\n' +
                                           '2: Break Block\n' +
                                           '3: Place Block');
-  var movespeed = 0.005;
-  var jumpspeed = 0.07;
+  var movespeed = 0.02;
+  var jumpspeed = 0.03;
 
   var moveX = 0;
   var moveY = 0;
   var moveZ = 0;
+
+  var jumped = false;
 
   document.addEventListener('keydown', async (e) => {
     switch (e.key) {
@@ -115,19 +118,25 @@ async function init() {
         tracer.switchCamera(1)
         break;
       case 'w': case 'W':
-        moveZ += movespeed;
+        Input.setForward(1);
+        // moveZ += movespeed;
         break;
       case 'a': case 'A':
-        moveX -= movespeed;
+        Input.setLeft(1);
+        // moveX -= movespeed;
         break;
       case 's': case 'S':
-        moveZ -= movespeed;
+        Input.setBackward(1);
+        // moveZ -= movespeed;
         break;
       case 'd': case 'D':
-        moveX += movespeed;
+        Input.setRight(1);
+        // moveX += movespeed;
         break;
       case ' ':
-        moveY -= jumpspeed;
+        Input.setJump(1);
+        jumped = false;
+        // moveY -= jumpspeed;
         break;
       case "1": 
         Input.getWeather(tracerObj, directionalLight);
@@ -145,13 +154,38 @@ async function init() {
   }
   });
 
+  document.addEventListener('keyup', (e) => {
+    switch (e.key) {
+      case 'w': case 'W':
+        Input.setForward(0);
+        // moveZ += movespeed;
+        break;
+      case 'a': case 'A':
+        Input.setLeft(0);
+        // moveX -= movespeed;
+        break;
+      case 's': case 'S':
+        Input.setBackward(0);
+        // moveZ -= movespeed;
+        break;
+      case 'd': case 'D':
+        Input.setRight(0);
+        // moveX += movespeed;
+        break;
+      case ' ':
+        Input.setJump(0);
+        // moveY -= jumpspeed;
+        break;
+    }
+  });
+
 
 
 
   var rotX = 0;
   var rotY = 0;
  
-  document.addEventListener("mousedown", (event) => {
+  canvasTag.addEventListener("mousedown", (event) => {
     canvasTag.requestPointerLock();
   });
    
@@ -196,8 +230,13 @@ async function init() {
 
     document.addEventListener('moveJoystick', (event) => {
       const { a, b } = event.detail;
+      // Input.setLeft(b);
+      // Input.setRight(b);
+      // Input.setForward(a);
+      // Input.setBackward(a);
       moveX +=b*0.001 //left/right 
       moveZ += a*0.001  //forward/back
+      // console.log(Input.getMovement())
     });
 
     document.addEventListener('rotateJoystick', (event) => {
@@ -209,8 +248,15 @@ async function init() {
     
   
     document.addEventListener("updateCameraPose", (e) => {
+      var movement = Input.getMovement();
+      moveX += (movement[0] * movespeed);
+      moveZ += (movement[1] * movespeed);
+      if (!jumped) {
+        moveY -= (Input.getJump() * jumpspeed);
+        jumped = true;
+      }
+
       if (e.detail.pose.length == 48) {
-        //leftCamera.moveY(0.02);
         leftCamera._pose.set(e.detail.pose.slice(0,16));
         leftCamera.moveX(moveX);
         leftCamera.moveY(moveY);
@@ -234,7 +280,7 @@ async function init() {
     })
 
   setInterval(async () => {
-    tracerObj.getRaycastChecks();
+    await tracerObj.getRaycastChecks();
   }, 1)
 
   // Update FPS text
