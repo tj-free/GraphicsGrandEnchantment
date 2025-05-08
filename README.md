@@ -12,6 +12,13 @@ We implemented basic physics for the VR camera, including gravity and collision 
 
 ---
 
+## Why is VR Not Working?
+
+To get VR to work, you currently need to start a WebXR VR session and then end it before trying to run the website with VR.
+[WebXR VR Session](https://immersive-web.github.io/webxr-samples/immersive-vr-session.html)
+
+---
+
 ## VR Implementation
 
 The VR portion of the project required significant research and problem-solving:
